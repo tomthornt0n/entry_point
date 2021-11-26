@@ -53,7 +53,7 @@ command_list =
         .cursor_at_end = false,
         .cmd =
         {
-            { "pushd build && app.exe && popd", .os = "win" },
+            { "pushd build && test_app_debug.exe && popd", .os = "win" },
             { "echo Linux run command not implemented for 4coder project.", .os = "linux" },
         },
     },

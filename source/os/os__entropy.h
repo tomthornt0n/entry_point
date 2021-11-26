@@ -1,1 +1,1 @@
-static int OS_EntropyGet(void);
+Function int EntropyGet (void);

@@ -1,19 +1,22 @@
 
-//~NOTE(tbt): base thread context type and functions
+//~NOTE(tbt): base thread context type and Functions
 
 typedef struct
 {
- M_ScratchPool scratch_pool;
- int logical_thread_index;
-} OS_ThreadContext;
-typedef OS_ThreadContext OS_TC;
+    int logical_thread_index;
+    
+    M_ScratchPool scratch_pool;
+    M_Arena permanent_arena;
+    
+    S8 exe_path;
+} TC_Data;
 
-static void OS_TC_Make_(OS_TC *tctx);                          // NOTE(tbt): platform specific thread context struct init
-static void OS_TC_Make(OS_TC *tctx, int logical_thread_index); // NOTE(tbt): thread context struct init
-static OS_TC *OS_TC_Get(void);                                 // NOTE(tbt): gets the thread local context pointer
-static void OS_TC_Set(OS_TC *ptr);                             // NOTE(tbt): sets the thread local context pointer
+Function void  TC_Make    (TC_Data *tctx, int logical_thread_index);
+Function void  TC_Destroy (TC_Data *tctx);
+
+Function TC_Data *TC_Get  (void);         // NOTE(tbt): gets the thread local context pointer
+Function void     TC_Set  (TC_Data *ptr); // NOTE(tbt): sets the thread local context pointer
 
 //~NOTE(tbt): wrappers and helpers
 
-static M_Temp OS_TC_ScratchMemGet(void **non_conflict, int non_conflict_count);
-#define OS_TC_ScratchMem(var, non_conflict, non_conflict_count) DeferLoop((var) = OS_TC_ScratchMemGet(non_conflict, non_conflict_count), M_TempEnd(&(var)))
+Function M_Temp TC_ScratchGet (M_Arena *non_conflict[], int non_conflict_count);

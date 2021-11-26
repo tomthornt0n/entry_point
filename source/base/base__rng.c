@@ -1,7 +1,7 @@
 
 //~NOTE(tbt): 'noise' via hashing a position
 
-static unsigned int
+Function unsigned int
 Noise1U(unsigned int a)
 {
     unsigned int result = a;
@@ -14,7 +14,7 @@ Noise1U(unsigned int a)
     return result;
 }
 
-static int
+Function int
 Noise2I(V2I a)
 {
     int result;
@@ -23,7 +23,7 @@ Noise2I(V2I a)
     return result;
 }
 
-static float
+Function float
 Noise2F(V2F a)
 {
     float result;
@@ -45,23 +45,31 @@ Noise2F(V2F a)
 
 //~NOTE(tbt): pseudo-random sequence
 
-static unsigned int rand_int_seed = 0;
-
-static void
-RandIntInit(int seed)
+Function void
+RandIntIncrement_(volatile int *a)
 {
-    rand_int_seed = seed;
+    (*a) += 1;
 }
 
-static int
+Global unsigned int rand_int_seed = 0;
+Global void( *rand_int_interlocked_increment)(volatile int *) = RandIntIncrement_;
+
+Function void
+RandIntInit(int seed, void( *interlocked_increment_callback)(volatile int *))
+{
+    rand_int_seed = seed;
+    rand_int_interlocked_increment = interlocked_increment_callback;
+}
+
+Function int
 RandIntNextRaw(void)
 {
     int result = Noise1U(rand_int_seed);
-    rand_int_seed += 1;
+    rand_int_interlocked_increment(&rand_int_seed);
     return result;
 }
 
-static int
+Function int
 RandIntNext(int min, int max)
 {
     int result = RandIntNextRaw();
@@ -71,7 +79,7 @@ RandIntNext(int min, int max)
 
 //~NOTE(tbt): perlin noise
 
-static float
+Function float
 Perlin2D(V2F a,
          float freq,
          int depth)

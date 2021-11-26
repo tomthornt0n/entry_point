@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <limits.h>
+#include <float.h>
 
 //~NOTE(tbt): base layer header files
 #include "base__context_cracking.h"
@@ -12,5 +13,5 @@
 #include "base__memory.h"
 #include "base__strings.h"
 #include "base__time.h"
-#include "base__input.h"
 #include "base__rng.h"
+#include "base__sort.h"

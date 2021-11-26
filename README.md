@@ -1,5 +1,46 @@
 # Entry Point - A Template for starting new C projects
 This is not intended to be used as a library, separate from the custom code.
 It is instead intended to be a template for new projects, containing a selection of code which is common amongst many codebases.
-In some places, features are left intentionally uncomplete, with the intention of them being modified to suit the specific project - e.g. the windowing system makes no effort to create a graphics context of any kind.
 
+
+## build system
+The entire project is built as a single translation unit, with all source files being included into `main.c`
+To build on windows, simply run `build.bat` (ensuring CL.exe is in your PATH).
+
+## codebase structure
+The codebase is divided into layers, each of which depend on the layers below it and nothing else
+
+### base layer
+This layer contains the most fundamental utilities. It depends on `stb_sprintf.h`, but nothing else - not even the OS or the C runtime.
+It includes:
+* misc. macros and helpers
+* 'context cracking' (gathering info about CPU architecture, OS, compiler, etc.)
+* memory allocators and utilities
+* length based strings
+* sorting
+* a small math library
+* random number generation
+* types for storing times
+
+### os layer
+This layer contains basic OS functionality. It depends on the base layer and the OS.
+It includes:
+* an implicit thread context
+* basic console logging
+* date/time and precision time functions
+* rudimentary file io
+* shared library loading
+* entropy
+* threading and synchronisation (never actually been used so probably very buggy)
+* clipboard control
+
+### graphics layer
+This layer include basic rendering functionality to assist with getting something on the screen quickly.
+It depends on the base layer, the os layer, the OS itself, `stb_rect_pack.h` and `stb_truetype.h`.
+It includes:
+* window and graphics context creation
+* input event queues
+* a render command queue system
+* sprite rendering
+* shape rendering (rectangle fill, rectanlge stroke, circle, rounded rectangle)
+* basic text rendering

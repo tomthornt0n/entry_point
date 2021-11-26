@@ -1,3 +1,4 @@
+
 //~NOTE(tbt): base layer
 #include "base/base.h"
 #include "base/base.c"
@@ -6,77 +7,90 @@
 #include "os/os.h"
 #include "os/os.c"
 
-//~NOTE(tbt): app
+//~NOTE(tbt): graphics layer
+#include "graphics/graphics.h"
+#include "graphics/graphics.c"
 
-static void
-PrintFileProperties(OS_F_Properties file_properties)
-{
-    OS_ConsoleOutputFmt(" - exists\t: %d\n"
-                        " - is directory\t: %d\n"
-                        " - is hidden\t: %d\n"
-                        " - size\t\t: %zd bytes\n",
-                        !!(file_properties.flags & OS_F_PropertiesFlags_Exists),
-                        !!(file_properties.flags & OS_F_PropertiesFlags_IsDirectory),
-                        !!(file_properties.flags & OS_F_PropertiesFlags_Hidden),
-                        file_properties.size);
-}
+//~NOTE(tbt): app layer
+#include "app/app.h"
+#include "app/app.c"
 
-static void
-PrintDateTime(T_DateTime date_time)
-{
-    M_Temp scratch;
-    OS_TC_ScratchMem(scratch, NULL, 0)
-    {
-        S8 human_readable_time = T_S8FromDateTime(scratch.arena, date_time);
-        OS_ConsoleOutputFmt("%.*s\n", Unravel(human_readable_time));
-    }
-}
+//~NOTE(tbt): entry point
 
-static void
-PrintDenseTime(T_DenseTime dense_time)
-{
-    M_Temp scratch;
-    OS_TC_ScratchMem(scratch, NULL, 0)
-    {
-        S8 human_readable_time = T_S8FromDenseTime(scratch.arena, dense_time);
-        OS_ConsoleOutputFmt("%.*s\n", Unravel(human_readable_time));
-    }
-}
-
-int
-A_EntryPoint(void)
-{
-    OS_Init();
-    
-    OS_AV_FrameState *gctx;
-    if(OS_AV_ContextMake(&gctx, S8("test window")))
-    {
-        while(OS_AV_FrameBegin(gctx))
-        {
-            // NOTE(tbt): do stuff here
-#if 1
-            for(OS_Event *e = gctx->events;
-                (e - gctx->events) < gctx->events_count;
-                e += 1)
-            {
-                if(e->kind == OS_EventKind_Char)
-                {
-                    M_Temp scratch;
-                    OS_TC_ScratchMem(scratch, NULL, 0)
-                    {
-                        S8 string = UTF8FromCodepoint(scratch.arena, e->codepoint);
-                        OS_ConsoleOutputFmt("%.*s\n", Unravel(string));
-                    }
-                }
-            }
+#if Build_NoCRT
+# define EntryPoint Function int APP_EntryPoint(void)
+#else
+# define EntryPoint int main(int argc, char **argv)
 #endif
-            
-            OS_AV_FrameEnd(gctx);
-        }
-        OS_AV_ContextDestroy(gctx);
-    }
+
+R_Font *my_cool_font;
+
+enum { APP_TextEditCap = 512, };
+
+typedef struct
+{
+    char text_edit_backing[APP_TextEditCap];
+    S8 text_edit;
+    I1U text_edit_selection;
+    V4F bg;
+    V4F fg;
+} APP_WindowData;
+
+Function void
+APP_WindowHookMake(W_Handle window)
+{
+    M_Arena *arena = G_ArenaFromWindow(window);
+    APP_WindowData *data = M_ArenaPush(arena, sizeof(*data));
+    data->text_edit.buffer = data->text_edit_backing;
+    data->fg = Col(1.0f / RandIntNext(0, 10), 1.0f / RandIntNext(0, 10), 1.0f / RandIntNext(0, 10), 1.0f);
+    data->bg = Col(1.0f / RandIntNext(0, 10), 1.0f / RandIntNext(0, 10), 1.0f / RandIntNext(0, 10), 1.0f);
+    W_UserDataSet(window, data);
+}
+
+Function void
+APP_WindowHookDraw(W_Handle window)
+{
     
-    OS_Cleanup();
+    APP_WindowData *data = W_UserDataGet(window);
+    if(NULL != data)
+    {
+        R_CmdClear(data->bg);
+        UI_EditText(data->text_edit_backing, APP_TextEditCap, &data->text_edit_selection, &data->text_edit.len);
+        UI_DrawS8WithCaret(my_cool_font, data->text_edit, V2F(200.0f, 200.0f), data->fg, &data->text_edit_selection);
+    }
+}
+
+Function void
+APP_WindowHookDestroy(W_Handle window)
+{
+    return;
+}
+
+Function void
+APP_MasterWindowHookDestroy(W_Handle window)
+{
+    for(G_WindowsForEach(w))
+    {
+        G_WindowClose(w);
+    }
+}
+
+EntryPoint
+{
+    G_Init();
+    *G_ShouldBlockToWaitForEvents() = True;
+    my_cool_font = R_FontMake(S8("font.ttf"), 48);
+    G_AppHooks hooks =
+    {
+        APP_WindowHookMake,
+        APP_WindowHookDraw,
+        APP_WindowHookDestroy,
+    };
+    W_Handle w1 = G_WindowOpen(S8("window 1"), V2I(640, 480), hooks);
+    W_Handle w2 = G_WindowOpen(S8("window 2"), V2I(640, 480), hooks);
+    W_Handle w3 = G_WindowOpen(S8("master window"), V2I(640, 480), G_AppHooks(APP_WindowHookMake, APP_WindowHookDraw, APP_MasterWindowHookDestroy));
+    G_MainLoop();
+    G_Cleanup();
     
     return 0;
 }

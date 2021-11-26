@@ -1,6 +1,6 @@
 
 //~NOTE(tbt): OS layer headers
-#include "os__misc.h"
+#include "os__init.h"
 #include "os__memory.h"
 #include "os__thread_context.h"
 #include "os__console.h"
@@ -8,8 +8,9 @@
 #include "os__file_io.h"
 #include "os__entropy.h"
 #include "os__shared_libraries.h"
-#include "os__audiovisual.h"
+#include "os__thread.h"
+#include "os__clipboard.h"
 
-// TODO(tbt): get file paths
-// TODO(tbt): command line argument getter
-
+#if Build_NoCRT
+Function int APP_EntryPoint(void);
+#endif
