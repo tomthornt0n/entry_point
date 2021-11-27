@@ -551,13 +551,24 @@ W32_WindowProc(HWND window_handle,
         
         case(WM_CHAR):
         {
-            EV_Data event =
+            unsigned int char_input = w_param;
+            if(VK_RETURN == char_input ||
+               (char_input >= 32 &&
+                char_input != VK_ESCAPE &&
+                char_input != 127))
             {
-                .kind = EV_Kind_Char,
-                .modifiers = modifiers,
-                .codepoint = w_param,
-            };
-            EV_QueuePush(&w->events, event);
+                if(VK_RETURN == char_input)
+                {
+                    char_input = '\n';
+                }
+                EV_Data event =
+                {
+                    .kind = EV_Kind_Char,
+                    .modifiers = modifiers,
+                    .codepoint = char_input,
+                };
+                EV_QueuePush(&w->events, event);
+            }
         } break;
         
         default:

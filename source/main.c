@@ -78,6 +78,7 @@ APP_MasterWindowHookDestroy(W_Handle window)
 EntryPoint
 {
     G_Init();
+    
     *G_ShouldBlockToWaitForEvents() = True;
     my_cool_font = R_FontMake(S8("font.ttf"), 48);
     G_AppHooks hooks =

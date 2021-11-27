@@ -267,35 +267,22 @@ UI_EditText(char buffer[], size_t cap,
         
         if(EV_Kind_Key == e->kind && e->is_down)
         {
-            if(I_Key_Left == e->key || I_Key_Right == e->key)
+            if((selection->cursor != selection->mark && !(e->modifiers & I_Modifiers_Shift)) &&
+               (I_Key_Left == e->key || I_Key_Right == e->key ||
+                I_Key_Home == e->key || I_Key_End == e->key))
             {
-                if(selection->cursor == selection->mark || (e->modifiers & I_Modifiers_Shift))
-                {
-                    action.flags |= ActionFlags_MoveCursor;
-                    action.offset = (I_Key_Left == e->key) ? -1 : +1;
-                }
-                else if(I_Key_Left == e->key)
-                {
-                    selection->cursor = MinInU(selection->elements);
-                    selection->mark = selection->cursor;
-                }
-                else
-                {
-                    selection->cursor = MaxInU(selection->elements);
-                    selection->mark = selection->cursor;
-                }
+                selection->mark = (I_Key_Left == e->key || I_Key_Home == e->key) ? MinInU(selection->elements) : MaxInU(selection->elements);
+                selection->cursor = selection->mark;
+            }
+            else if(I_Key_Left == e->key || I_Key_Right == e->key)
+            {
+                action.flags |= ActionFlags_MoveCursor;
+                action.offset = (I_Key_Left == e->key) ? -1 : +1;
             }
             else if(I_Key_Home == e->key || I_Key_End == e->key)
             {
                 action.flags |= ActionFlags_MoveCursor;
-                if(I_Key_Home == e->key)
-                {
-                    action.offset = INT_MIN;
-                }
-                else
-                {
-                    action.offset = INT_MAX;
-                }
+                action.offset = (I_Key_Home == e->key) ? INT_MIN : INT_MAX;
             }
             else if(I_Key_Backspace == e->key || I_Key_Delete == e->key)
             {
@@ -370,15 +357,19 @@ UI_EditText(char buffer[], size_t cap,
                 EV_Consume(e);
             }
         }
-        else if(EV_Kind_Char == e->kind && CharIsPrintable(e->codepoint))
+        else if(EV_Kind_Char == e->kind)
         {
-            M_Arena str = M_ArenaFromArray(character_insertion_buffer);
-            action.flags |= ActionFlags_Insert;
-            action.flags |= ActionFlags_MoveCursor;
-            action.flags |= ActionFlags_PreDelete;
-            action.to_insert = UTF8FromCodepoint(&str, e->codepoint);
-            action.offset = 1;
-            G_ForceNextUpdate();
+            // TODO(tbt): multiline text edits
+            if('\n' != e->codepoint)
+            {
+                M_Arena str = M_ArenaFromArray(character_insertion_buffer);
+                action.flags |= ActionFlags_Insert;
+                action.flags |= ActionFlags_MoveCursor;
+                action.flags |= ActionFlags_PreDelete;
+                action.to_insert = UTF8FromCodepoint(&str, e->codepoint);
+                action.offset = 1;
+                G_ForceNextUpdate();
+            }
             EV_Consume(e);
         }
         
@@ -510,7 +501,7 @@ UI_DrawS8WithCaret(R_Font *font,
                     if(R_MeasuredTextIndex_None != clicked_char_index)
                     {
                         size_t clicked_byte_index = S8ByteIndexFromCharIndex(string, clicked_char_index);
-                        selection->cursor = clicked_byte_index + 1;
+                        selection->cursor = clicked_byte_index;
                         EV_Consume(e);
                     }
                 }
