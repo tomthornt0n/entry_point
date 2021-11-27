@@ -152,9 +152,9 @@ F_PropertiesGet(S8 filename)
         result.flags = W32_FilePropertiesFlagsFromFileAttribs(attribs.dwFileAttributes);
         result.size = W32_U64FromHiAndLoWords(attribs.nFileSizeHigh, attribs.nFileSizeLow);
         result.access_flags = W32_DataAccessFlagsFromFileAttribs(attribs.dwFileAttributes);
-        result.creation_time = W32_T_DenseTimeFromFileTime(attribs.ftCreationTime);
-        result.access_time = W32_T_DenseTimeFromFileTime(attribs.ftLastAccessTime);
-        result.write_time = W32_T_DenseTimeFromFileTime(attribs.ftLastWriteTime);
+        result.creation_time = W32_DenseTimeFromFileTime(attribs.ftCreationTime);
+        result.access_time = W32_DenseTimeFromFileTime(attribs.ftLastAccessTime);
+        result.write_time = W32_DenseTimeFromFileTime(attribs.ftLastWriteTime);
     }
     M_TempEnd(&scratch);
     return result;
@@ -224,7 +224,7 @@ F_IteratorMake(M_Arena *arena, S8 directory)
     result->_.directory = S8Clone(arena, directory);
     
     M_Temp scratch = TC_ScratchGet(&arena, 1);
-    S16 directory_s16 = S16FromS8(scratch.arena, S8FromFmt(scratch.arena, "%.*s\\*", Unravel(directory)));
+    S16 directory_s16 = S16FromS8(scratch.arena, S8FromFmt(scratch.arena, "%.*s\\*", FmtS8(directory)));
     result->handle = FindFirstFileW(directory_s16.buffer, &result->find_data);
     M_TempEnd(&scratch);
     
@@ -258,9 +258,9 @@ F_IteratorNext(M_Arena *arena, F_Iterator *iter)
                 iter->current_properties.size = W32_U64FromHiAndLoWords(_iter->find_data.nFileSizeHigh, _iter->find_data.nFileSizeLow);
                 iter->current_properties.flags = W32_FilePropertiesFlagsFromFileAttribs(_iter->find_data.dwFileAttributes);
                 iter->current_properties.access_flags = W32_DataAccessFlagsFromFileAttribs(_iter->find_data.dwFileAttributes);
-                iter->current_properties.creation_time = W32_T_DenseTimeFromFileTime(_iter->find_data.ftCreationTime);
-                iter->current_properties.access_time = W32_T_DenseTimeFromFileTime(_iter->find_data.ftLastAccessTime);
-                iter->current_properties.write_time = W32_T_DenseTimeFromFileTime(_iter->find_data.ftLastWriteTime);
+                iter->current_properties.creation_time = W32_DenseTimeFromFileTime(_iter->find_data.ftCreationTime);
+                iter->current_properties.access_time = W32_DenseTimeFromFileTime(_iter->find_data.ftLastAccessTime);
+                iter->current_properties.write_time = W32_DenseTimeFromFileTime(_iter->find_data.ftLastWriteTime);
                 result = True;
             }
             
@@ -428,7 +428,7 @@ AbsolutePathFromRelativePath(M_Arena *arena, S8 path)
     Bool is_drive_id = ((2 == path.len) && CharIsLetter(path.buffer[0]) && (':' == path.buffer[1]));
     if(is_drive_id)
     {
-        result = S8FromFmt(arena, "%.*s\\", Unravel(path));
+        result = S8FromFmt(arena, "%.*s\\", FmtS8(path));
     }
     else
     {

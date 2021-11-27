@@ -825,15 +825,15 @@ FilenamePush(M_Arena *arena, S8 filename, S8 string)
     if(FilenameHasTrailingSlash(filename) || 0 == filename.len)
     {
         result = S8FromFmt(arena, "%.*s%.*s",
-                           Unravel(filename),
-                           Unravel(string));
+                           FmtS8(filename),
+                           FmtS8(string));
     }
     else
         
     {
         result = S8FromFmt(arena, "%.*s" DirectorySeparatorStr "%.*s",
-                           Unravel(filename),
-                           Unravel(string));
+                           FmtS8(filename),
+                           FmtS8(string));
     }
     
     return result;

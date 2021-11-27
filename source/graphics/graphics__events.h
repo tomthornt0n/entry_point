@@ -14,12 +14,12 @@ typedef enum
 } EV_Kind;
 
 #define EV_S8FromKind(K) \
-(EV_Kind_None        == (K) ? S8("None") :         \
-EV_Kind_Key         == (K) ? S8("Key") :          \
-EV_Kind_Char        == (K) ? S8("Char") :         \
-EV_Kind_MouseMove   == (K) ? S8("Mouse Move") :   \
-EV_Kind_MouseScroll == (K) ? S8("Mouse Scroll") : \
-EV_Kind_MouseLeave  == (K) ? S8("Mouse Leave") :  \
+(EV_Kind_None        == (K) ? S8("None")          : \
+EV_Kind_Key         == (K) ? S8("Key")           : \
+EV_Kind_Char        == (K) ? S8("Char")          : \
+EV_Kind_MouseMove   == (K) ? S8("Mouse Move")    : \
+EV_Kind_MouseScroll == (K) ? S8("Mouse Scroll")  : \
+EV_Kind_MouseLeave  == (K) ? S8("Mouse Leave")   : \
 EV_Kind_WindowSize  == (K) ? S8("Window Resize") : S8("ERROR - NOT AN EVENT KIND"))
 
 typedef struct
