@@ -298,10 +298,12 @@ W32_WindowProc(HWND window_handle,
                 ID3D11RenderTargetView_Release(w->depth_stencil_view);
                 ID3D11Resource_Release(w->backbuffer_render_target_texture);
                 ID3D11Resource_Release(w->render_target_texture);
-                w->depth_stencil_view = NULL;
                 w->backbuffer_render_target_view = NULL;
+                w->render_target_view = NULL;
+                w->depth_stencil_view = NULL;
+                w->backbuffer_render_target_texture = NULL;
+                w->render_target_texture = NULL;
             }
-            
             if(window_dimensions.x > 0 &&
                window_dimensions.y > 0)
             {
@@ -583,7 +585,7 @@ W32_WindowProc(HWND window_handle,
 Function void
 W32_WindowDraw(W32_Window *w)
 {
-    if(NULL != w->draw)
+    if(NULL != w->draw && NULL != w->render_target_view)
     {
         M_ArenaClear(&w->frame_arena);
         w->r_cmd_queue.cmds_count = 0;
