@@ -87,6 +87,15 @@ T_UTCFromLTC(T_DateTime local_time)
     return result;
 }
 
+Function T_DateTime
+T_LTCGet(void)
+{
+    T_DateTime universal_time = T_UTCGet();
+    T_DateTime result = T_LTCFromUTC(universal_time);
+    return result;
+}
+
+
 //~NOTE(tbt): precision time
 
 Function void

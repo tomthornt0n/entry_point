@@ -1,7 +1,7 @@
 Function void
 ConsoleOutputFmtV(char *fmt, va_list args)
 {
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S8 string = S8FromFmtV(scratch.arena, fmt, args);
     ConsoleOutputS8(string);
     M_TempEnd(&scratch);
@@ -14,4 +14,11 @@ ConsoleOutputFmt(char *fmt, ...)
     va_start(args, fmt);
     ConsoleOutputFmtV(fmt, args);
     va_end(args);
+}
+
+Function void
+ConsoleOutputLine(S8 string)
+{
+    ConsoleOutputS8(string);
+    ConsoleOutputS8(S8("\n"));
 }

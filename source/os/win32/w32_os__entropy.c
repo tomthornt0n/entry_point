@@ -1,10 +1,16 @@
+Function void
+EntropyGet(void *buffer, size_t size)
+{
+    HCRYPTPROV ctx = 0;
+    CryptAcquireContextW(&ctx, 0, 0, PROV_DSS, CRYPT_VERIFYCONTEXT);
+    CryptGenRandom(ctx, size, buffer);
+    CryptReleaseContext(ctx, 0);
+}
+
 Function int
-EntropyGet(void)
+IntFromEntropy(void)
 {
     int result;
-    HCRYPTPROV ctx = 0;
-    CryptAcquireContextW(&ctx, NULL, NULL, PROV_DSS, CRYPT_VERIFYCONTEXT);
-    CryptGenRandom(ctx, sizeof(result), (BYTE *)&result);
-    CryptReleaseContext(ctx, 0);
+    EntropyGet(&result, sizeof(result));
     return result;
 }

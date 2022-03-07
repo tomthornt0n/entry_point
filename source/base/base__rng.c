@@ -45,27 +45,26 @@ Noise2F(V2F a)
 
 //~NOTE(tbt): pseudo-random sequence
 
-Function void
+Function int
 RandIntIncrement_(volatile int *a)
 {
     (*a) += 1;
+    return *a;
 }
 
 Global unsigned int rand_int_seed = 0;
-Global void( *rand_int_interlocked_increment)(volatile int *) = RandIntIncrement_;
 
 Function void
-RandIntInit(int seed, void( *interlocked_increment_callback)(volatile int *))
+RandIntInit(int seed)
 {
     rand_int_seed = seed;
-    rand_int_interlocked_increment = interlocked_increment_callback;
 }
 
 Function int
 RandIntNextRaw(void)
 {
     int result = Noise1U(rand_int_seed);
-    rand_int_interlocked_increment(&rand_int_seed);
+    rand_int_seed += 1;
     return result;
 }
 

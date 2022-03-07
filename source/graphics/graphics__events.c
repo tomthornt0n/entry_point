@@ -47,7 +47,7 @@ EV_QueueIncrementNotConsumed_(EV_Queue *queue, EV_Data *current)
     {
         if((result - queue->events) >= queue->events_count)
         {
-            result = NULL;
+            result = 0;
             break;
         }
         if(!result->is_consumed)
@@ -86,9 +86,17 @@ EV_QueueHasKeyEvent(EV_Queue *queue,
     Bool result = False;
     for(EV_QueueForEach(queue, e))
     {
-        if(EV_Kind_Key == e->kind && key == e->key && modifiers == e->modifiers && is_down == e->is_down)
+        if(EV_Kind_Key == e->kind &&
+           key == e->key &&
+           (I_Modifiers_ANY == modifiers || modifiers == e->modifiers) &&
+           is_down == e->is_down)
         {
             result = True;
+            if(should_consume)
+            {
+                EV_Consume(e);
+            }
+            G_ForceNextUpdate();
             break;
         }
     }

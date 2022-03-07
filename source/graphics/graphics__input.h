@@ -5,9 +5,10 @@ typedef enum
     I_Modifiers_Ctrl  = Bit(0),
     I_Modifiers_Shift = Bit(1),
     I_Modifiers_Alt   = Bit(2),
+    I_Modifiers_ANY   = ~((I_Modifiers)0),
 } KeyModifiers_ENUM;
 
-#define KeyDef(name, string) I_Key_ ## name ## ,
+#define KeyDef(NAME, STRING, IS_REAL) I_Key_ ## NAME ,
 typedef enum
 {
 #include "graphics__keylist.h"

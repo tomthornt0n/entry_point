@@ -1,5 +1,6 @@
 
 //~NOTE(tbt): base layer implementation files
+#include "base__misc.c"
 #include "base__math.c"
 #include "base__memory.c"
 #include "base__rng.c"

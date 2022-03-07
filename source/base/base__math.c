@@ -2,7 +2,7 @@
 //~NOTE(tbt): single floats
 
 Function Bool
-IsNan1F(float a)
+IsNaN1F(float a)
 {
     union AsUint32
     {
@@ -25,7 +25,7 @@ Function float
 InterpolateLinear1F(float a, float b,
                     float t) // NOTE(tbt): (0.0 <= t <= 1.0)
 {
-    return t*a + (1.0f - t)*b;
+    return a + t*(b - a);
 }
 
 Function float
@@ -385,20 +385,6 @@ Maxs4F(V4F a, V4F b)
         .y = Max1F(a.y, b.y),
         .z = Max1F(a.z, b.z),
         .w = Max1F(a.w, b.w),
-    };
-    return result;
-}
-
-Function V4F
-SetAlpha4F(V4F col, float a)
-{
-    float mul = (1.0f / col.a)*a;
-    V4F result =
-    {
-        .r = col.r*mul,
-        .g = col.g*mul,
-        .b = col.b*mul,
-        .a = a,
     };
     return result;
 }
@@ -973,6 +959,20 @@ Dot4I(V4I a, V4I b)
     return result;
 }
 
+Function int
+LengthSquared4I(V4I a)
+{
+    int result = a.x*a.x + a.y*a.y + a.z*a.z + a.w*a.w;
+    return result;
+}
+
+Function int
+Length4I(V4I a)
+{
+    int result = Sqrt1F(LengthSquared4I(a)) + 0.5f;
+    return result;
+}
+
 //-
 
 Function V3I
@@ -1045,6 +1045,20 @@ Cross3i(V3I a, V3I b)
     return result;
 }
 
+Function int
+LengthSquared3I(V3I a)
+{
+    int result = a.x*a.x + a.y*a.y + a.z*a.z;
+    return result;
+}
+
+Function int
+Length3I(V3I a)
+{
+    int result = Sqrt1F(LengthSquared3I(a)) + 0.5f;
+    return result;
+}
+
 //-
 
 Function V2I
@@ -1096,6 +1110,20 @@ Dot2I(V2I a, V2I b)
     int result = 0;
     result += a.x*b.x;
     result += a.y*b.y;
+    return result;
+}
+
+Function int
+LengthSquared2I(V2I a)
+{
+    int result = a.x*a.x + a.y*a.y;
+    return result;
+}
+
+Function int
+Length2I(V2I a)
+{
+    int result = Sqrt1F(LengthSquared2I(a)) + 0.5f;
     return result;
 }
 
@@ -1161,13 +1189,12 @@ RectMake2F(V2F pos, V2F dimensions)
 }
 
 Function I2F
-Expand2F(I2F a, float b)
+Expand2F(I2F a, V2F b)
 {
-    V2F _b = U2F(b);
     I2F result =
     {
-        .min = Sub2F(a.min, _b),
-        .max = Add2F(a.max, _b),
+        .min = Sub2F(a.min, b),
+        .max = Add2F(a.max, b),
     };
     return result;
 }

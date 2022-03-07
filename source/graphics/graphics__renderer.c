@@ -4,7 +4,7 @@
 Function Bool
 R_SpriteIsNil(R_Sprite *sprite)
 {
-    Bool result = (NULL == sprite || R_SpriteNil() == sprite);
+    Bool result = (0 == sprite || R_SpriteNil() == sprite);
     return result;
 }
 
@@ -22,6 +22,30 @@ R_SubSpriteFromSprite(R_Sprite *sprite, I2F region)
 
 //~NOTE(tbt): fonts / text
 
+Function R_Font *
+R_FontFromFile(S8 filename, int size)
+{
+    R_Font *result = 0;
+    
+    M_Temp scratch = TC_ScratchGet(0, 0);
+    S8 file = F_ReadEntire(scratch.arena, filename);
+    if(0 != file.buffer)
+    {
+        result = R_FontMake(file, size);
+    }
+    M_TempEnd(&scratch);
+    
+    return result;
+}
+
+Function void
+R_FontDestroy(R_Font *font)
+{
+    R_SpriteDestroy(font->ascii_atlas);
+    R_SpriteDestroy(font->glyph_cache_atlas);
+    M_ArenaDestroy(&font->arena);
+}
+
 Function R_MeasuredText
 R_MeasureS8(M_Arena *arena,
             R_Font *font,
@@ -32,27 +56,24 @@ R_MeasureS8(M_Arena *arena,
     
     R_MeasuredText result = {0};
     
+    result.position = position;
+    result.string = S8Clone(arena, string);
+    result.codepoints = S32FromS8(arena, string);
+    
     V2F cur = position;
     Bool is_start_of_line = True;
-    int i = 0;
-    int rect_index = 0;
-    for(UTFConsume consume = CodepointFromUTF8(string, i);
-        i < string.len;
-        ((i += consume.advance),
-         (consume = CodepointFromUTF8(string, i)),
-         (rect_index += 1)))
+    for(size_t i = 0; i < result.codepoints.len; i += 1)
     {
-        unsigned int c = consume.codepoint;
+        unsigned int c = result.codepoints.buffer[i];
+        
         int gi = stbtt_FindGlyphIndex(&font->font_info, c);
         
         int kern = 0;
         if(font->is_kerning_enabled)
         {
-            int j = i + consume.advance;
-            UTFConsume consume_1 = CodepointFromUTF8(string, j);
-            if(j + consume_1.advance < string.len)
+            if((i + 1) < result.codepoints.len)
             {
-                int gi_1 = stbtt_FindGlyphIndex(&font->font_info, consume_1.codepoint);
+                int gi_1 = stbtt_FindGlyphIndex(&font->font_info, result.codepoints.buffer[i + 1]);
                 kern = stbtt_GetGlyphKernAdvance(&font->font_info, gi, gi_1);
                 kern *= font->scale;
             }
@@ -65,22 +86,21 @@ R_MeasureS8(M_Arena *arena,
             r->base_line = cur.y;
             r->bounds.min = V2F(cur.x, cur.y - font->v_advance);
             r->bounds.max = V2F(cur.x + 2.0f, cur.y);
-            r->codepoint = consume.codepoint;
             if(is_start_of_line)
             {
                 r->closest.min = V2F(FLT_MIN, cur.y - font->v_advance);
                 r->closest.max = V2F(FLT_MAX, cur.y);
             }
-            if(NULL == result.rects)
+            if(0 == result.rects)
             {
                 result.rects = r;
             }
             result.rects_count += 1;
             cur.x = position.x;
             cur.y += font->v_advance;
-            if(rect_index > 0)
+            if(i > 0)
             {
-                result.rects[rect_index - 1].closest.max.x = FLT_MAX;
+                result.rects[i - 1].closest.max.x = FLT_MAX;
                 is_start_of_line = True;
                 
                 result.bounds.min = Mins2F(result.bounds.min, r->bounds.min);
@@ -102,8 +122,7 @@ R_MeasureS8(M_Arena *arena,
             r->base_line = cur.y;
             r->bounds.min = V2F(cur.x - advance*font->scale, cur.y - font->v_advance);
             r->bounds.max = V2F(cur.x, cur.y);
-            r->codepoint = consume.codepoint;
-            if(0 == rect_index)
+            if(0 == i)
             {
                 result.bounds = r->bounds;
             }
@@ -118,7 +137,7 @@ R_MeasureS8(M_Arena *arena,
                 r->closest.min.x = FLT_MIN;
                 is_start_of_line = False;
             }
-            if(NULL == result.rects)
+            if(0 == result.rects)
             {
                 result.rects = r;
             }
@@ -142,8 +161,7 @@ R_MeasureS8(M_Arena *arena,
             r->base_line = cur.y;
             r->bounds = I2F(V2F(q.x0, q.y0), V2F(q.x1, q.y1));
             r->closest = I2F(V2F(x, cur.y - font->v_advance), V2F(cur.x, cur.y));;
-            r->codepoint = consume.codepoint;
-            if(0 == rect_index)
+            if(0 == i)
             {
                 result.bounds = r->bounds;
             }
@@ -157,7 +175,7 @@ R_MeasureS8(M_Arena *arena,
                 r->closest.min.x = FLT_MIN;
                 is_start_of_line = False;
             }
-            if(NULL == result.rects)
+            if(0 == result.rects)
             {
                 result.rects = r;
             }
@@ -166,7 +184,7 @@ R_MeasureS8(M_Arena *arena,
         else
         {
             int advance;
-            stbtt_GetGlyphHMetrics(&font->font_info, gi, &advance, NULL);
+            stbtt_GetGlyphHMetrics(&font->font_info, gi, &advance, 0);
             advance *= font->scale;
             advance += kern;
             
@@ -183,8 +201,7 @@ R_MeasureS8(M_Arena *arena,
             r->base_line = cur.y;
             r->bounds = RectMake2F(V2F(cur.x + ix_0, cur.y + iy_0), V2F(ix_1 - ix_0, iy_1 - iy_0));
             r->closest = I2F(V2F(cur.x, cur.y - font->v_advance), V2F(cur.x + advance, cur.y));
-            r->codepoint = consume.codepoint;
-            if(0 == rect_index)
+            if(0 == i)
             {
                 result.bounds = r->bounds;
             }
@@ -198,7 +215,7 @@ R_MeasureS8(M_Arena *arena,
                 r->closest.min.x = FLT_MIN;
                 is_start_of_line = False;
             }
-            if(NULL == result.rects)
+            if(0 == result.rects)
             {
                 result.rects = r;
             }
@@ -207,6 +224,9 @@ R_MeasureS8(M_Arena *arena,
             cur.x += advance;
         }
     }
+    
+    result.bounds.max.x = Max1F(result.bounds.max.x, result.bounds.min.x);
+    result.bounds.max.y = Max1F(result.bounds.max.y, result.bounds.min.y);
     
     return result;
 }
@@ -258,7 +278,7 @@ R_MeasuredTextNearestIndexFromPosition(R_MeasuredText measured_text,
 Function V2F
 R_AdvanceFromS8(R_Font *font, S8 string)
 {
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     R_MeasuredText mt = R_MeasureS8(scratch.arena, font, string, U2F(0.0f));
     V2F result = Dimensions2F(mt.bounds);
     M_TempEnd(&scratch);
@@ -271,7 +291,7 @@ R_AdvanceFromS8(R_Font *font, S8 string)
 Function void
 R_CmdPush(R_CmdQueue *q, R_Cmd cmd)
 {
-    Assert(NULL != q);
+    Assert(0 != q);
     if(q->cmds_count < R_CmdQueue_Cap)
     {
         q->cmds[q->cmds_count] = cmd;
@@ -352,14 +372,16 @@ R_CmdQueueRecordingEnd(R_CmdQueue *q)
     if(r_recording_cmd_queue_stack_count > 1)
     {
         r_recording_cmd_queue_stack_count -= 1;
-        *top = NULL;
+        *top = 0;
     }
 }
 
 Function void
 R_CmdMake_(R_Cmd *cmd)
 {
-    cmd->sort_key = r_layer_stack[r_layer_stack_count - 1];
+    cmd->sort_key = (r_layer_stack[r_layer_stack_count - 1] % (1 << 16)) << 16;
+    cmd->sort_key |= cmd->kind << 8;
+    cmd->sort_key |= IntFromPtr(cmd->sprite) % 255;
     cmd->mask = r_mask_stack[r_mask_stack_count - 1];
 }
 
@@ -513,7 +535,8 @@ R_CmdSubQueue(R_CmdQueue *sub_queue)
 
 Function int
 R_CmdQueueSort_Comparator_(const void *a,
-                           const void *b)
+                           const void *b,
+                           void *user_data)
 {
     const R_Cmd *_a = a;
     const R_Cmd *_b = b;
@@ -524,8 +547,5 @@ R_CmdQueueSort_Comparator_(const void *a,
 Function void
 R_CmdQueueSort(R_CmdQueue *q)
 {
-    QSort(q->cmds,
-          q->cmds_count,
-          sizeof(q->cmds[0]),
-          R_CmdQueueSort_Comparator_);
+    Sort(q->cmds, q->cmds_count, sizeof(q->cmds[0]), R_CmdQueueSort_Comparator_, 0);
 }

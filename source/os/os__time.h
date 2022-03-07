@@ -12,3 +12,5 @@ Function void T_Sleep(size_t milliseconds);
 
 Function size_t T_MicrosecondsGet (void); // NOTE(tbt): query the performance counter to get the current time in microseconds
 Function double T_SecondsGet      (void); // NOTE(tbt): query the performance counter and convert to seconds
+
+#define T_LogBlock(N) size_t N ## _begin; DeferLoop(N ## _begin = T_MicrosecondsGet(), ConsoleOutputFmt(#N " took %zu microseconds\n", T_MicrosecondsGet() - N ## _begin))

@@ -4,7 +4,8 @@
 typedef struct
 {
     V2I dimensions;
-} R_Sprite;
+} 
+R_Sprite;
 
 Function R_Sprite *R_SpriteNil     (void);
 Function Bool      R_SpriteIsNil   (R_Sprite *sprite);
@@ -61,19 +62,23 @@ typedef struct
     R_FontGlyphCacheCellInfo glyph_cache_info[R_Font_GlyphCacheCellsCount];
 } R_Font;
 
-Function R_Font *R_FontMake(S8 filename, int size);
-Function void    R_FontDestroy(R_Font *font);
+Function R_Font *R_FontMake     (S8 font_data, int size);
+Function R_Font *R_FontFromFile (S8 filename, int size);
+Function void    R_FontDestroy  (R_Font *font);
 
 typedef struct
 {
-    size_t rects_count;
     I2F bounds;
+    V2F position;
+    S8 string;
+    S32 codepoints;
+    
+    size_t rects_count;
     struct R_MeasuredTextRect
     {
         I2F bounds;
         I2F closest;
         float base_line;
-        int codepoint;
     } *rects;
 } R_MeasuredText;
 typedef enum { R_MeasuredTextIndex_None = ~((size_t)0), } R_MeasuredTextIndex;
@@ -104,7 +109,7 @@ typedef struct R_CmdQueue R_CmdQueue;
 
 typedef struct
 {
-    unsigned int sort_key;
+    uint32_t sort_key;
     R_CmdKind kind;
     R_Sprite *sprite;
     R_SubSprite sub_sprite;

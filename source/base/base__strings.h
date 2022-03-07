@@ -1,6 +1,10 @@
 #undef STB_SPRINTF_IMPLEMENTATION
 #include "external/stb_sprintf.h"
 
+#if Build_ZLib
+# include "external/zlib/zlib.h"
+#endif
+
 //~NOTE(tbt): string types
 
 //-NOTE(tbt): utf8 ecnoded strings
@@ -8,8 +12,7 @@ typedef struct
 {
     char *buffer;
     size_t len;
-} String8;
-typedef String8 S8;
+} S8;
 #define S8(S) ((S8){ S, sizeof(S) - 1 })
 #define S8Initialiser(S) { .buffer = S, .len = sizeof(S) - 1, }
 
@@ -18,8 +21,7 @@ typedef struct
 {
     wchar_t *buffer;
     size_t len;
-} String16;
-typedef String16 S16;
+} S16;
 #define S16(S) ((S16){ WidenString(S), (sizeof(WidenString(S)) - 2) / 2 })
 
 //-NOTE(tbt): utf32 ecnoded strings
@@ -27,8 +29,7 @@ typedef struct
 {
     unsigned int *buffer;
     size_t len;
-} String32;
-typedef String32 S32;
+} S32;
 
 //~NOTE(tbt): fmt string helpers
 
@@ -70,7 +71,7 @@ Function S16    CStringAsS16                (wchar_t *cstring);
 typedef struct
 {
     unsigned int codepoint;
-    int advance; // NOTE(tbt): in characters
+    int advance;
 } UTFConsume;
 
 Function Bool UTF8IsContinuationByte (S8 string, int index);
@@ -100,23 +101,44 @@ typedef enum
     MatchFlags_CaseInsensitive = Bit(1),
 } MatchFlags;
 
+typedef struct
+{
+    S8 delimiter;
+    MatchFlags flags;
+    
+    S8 string;
+    
+    S8 current;
+} S8Split;
+
 Function S8       S8Clone                  (M_Arena *arena, S8 string);
-Function S8       S8Truncate               (M_Arena *arena, S8 string, size_t len);
+Function S8       S8CloneFL                (M_FreeList *free_list, S8 string);
+Function S8       S8Truncate               (S8 string, size_t len);
 Function S8       S8LFFromCRLF             (M_Arena *arena, S8 string);
 Function S8       S8FromFmtV               (M_Arena *arena, char *fmt, va_list args);
 Function S8       S8FromFmt                (M_Arena *arena, char *fmt, ...);
-Function S8       S8Strip                  (M_Arena *arena, S8 a, int b);
+Function S8       S8Replace                (M_Arena *arena, S8 string, S8 a, S8 b, MatchFlags flags);
+Function S8       S8PrefixGet              (S8 string, size_t len);
+Function S8       S8SuffixGet              (S8 string, size_t len);
+Function S8       S8Advance                (S8 *string, size_t n);
+Function Bool     S8Consume                (S8 *string, S8 consume);
 Function size_t   S8ByteIndexFromCharIndex (S8 string, size_t char_index);
 Function size_t   S8CharIndexFromByteIndex (S8 string, size_t byte_index);
 Function uint32_t S8Hash                   (S8 string);
 Function Bool     S8Match                  (S8 a, S8 b, MatchFlags flags);
 Function S8       S8Substring              (S8 h, S8 n, MatchFlags flags);
-Function S8       S8Advance                (S8 string, size_t n);
+Function Bool     S8HasSubstring           (S8 h, S8 n, MatchFlags flags);
+Function double   S8Parse1F                (S8 string);
+Function S8Split  S8SplitMake              (S8 string, S8 delimiter, MatchFlags flags);
+Function Bool     S8SplitNext              (S8Split *state);
 
 Function S16      S16Clone                 (M_Arena *arena, S16 string);
+Function S16      S16CloneFL               (M_FreeList *free_list, S16 string);
 Function uint32_t S16Hash                  (S16 string);
 Function Bool     S16Match                 (S16 a, S16 b, MatchFlags flags);
 
+
+//~NOTE(tbt): filename helpers
 
 #if Build_OSWindows
 # define DirectorySeparatorStr "\\"
@@ -130,6 +152,9 @@ Function S8       ExtensionFromFilename       (S8 filename);
 Function S8       FilenamePush                (M_Arena *arena, S8 filename, S8 string);
 Function S8       FilenamePop                 (S8 filename);
 Function S8       FilenameLast                (S8 filename);
+Function Bool     FilenameIsChild             (S8 parent, S8 filename);
+
+//~NOTE(tbt): misc.
 
 Function Bool     S8IsWordBoundary            (S8 string, size_t index);
 
@@ -146,39 +171,59 @@ typedef struct
 {
     S8Node *first;
     S8Node *last;
+    size_t count;
 } S8List;
-
-// NOTE(tbt): clones the string to the arena and allocates a new node in the arena
-Function S8Node *S8ListPush                   (M_Arena *arena, S8List *list, S8 string);
-Function S8Node *S8ListAppend                 (M_Arena *arena, S8List *list, S8 string);
-Function S8Node *S8ListRemoveFirstOccurenceOf (S8List *list, S8 string, MatchFlags flags);
-Function void    S8ListRemoveAllOccurencesOf  (S8List *list, S8 string, MatchFlags flags);
-
-// NOTE(tbt): simply inserts the passed node into the list
-Function void    S8ListPushExplicit   (S8List *list, S8Node *string);
-Function void    S8ListAppendExplicit (S8List *list, S8Node *string);
 
 typedef struct
 {
     Bool has;
     size_t i;
 } S8ListFind;
+Function S8ListFind S8ListIndexFromS8            (S8List list, S8 string, MatchFlags flags);
 
-Function S8List     S8ListClone          (M_Arena *arena, S8List list);
-Function S8         S8ListJoin           (M_Arena *arena, S8List list);
-Function S8         S8ListJoinDelimited  (M_Arena *arena, S8List list, S8 delimiter);
-Function S8         S8ListS8FromIndex    (S8List list, size_t index);
-Function S8ListFind S8ListIndexFromS8    (S8List list, S8 string, MatchFlags flags);
-Function Bool       S8ListHasS8          (S8List list, S8 string, MatchFlags flags);
-Function size_t     S8ListCount          (S8List list);
+typedef struct
+{
+    S8 prefix;    // NOTE(tbt): concatenated to the start of each node
+    S8 delimiter; // NOTE(tbt): added between every node
+    S8 suffix;    // NOTE(tbt): concatenated to the end of each node
+} S8ListJoinFormat;
+#define S8ListJoinFormat(...) ((S8ListJoinFormat){ __VA_ARGS__ })
 
-#define S8ListForEach(L, V) S8Node *(V) = (L).first; NULL != (V); (V) = (V)->next
+// NOTE(tbt): clones the string to the arena and allocates a new node in the arena
+Function S8Node    *S8ListPush                   (M_Arena *arena, S8List *list, S8 string);
+Function S8Node    *S8ListAppend                 (M_Arena *arena, S8List *list, S8 string);
+Function void       S8ListConcatenate            (M_Arena *arena, S8List *a, S8List b); // NOTE(tbt): DOES NOT CLONE A
+
+// NOTE(tbt): simply inserts the passed node into the list
+Function void       S8ListPushExplicit           (S8List *list, S8Node *string);
+Function void       S8ListAppendExplicit         (S8List *list, S8Node *string);
+
+Function S8List     S8ListClone                  (M_Arena *arena, S8List list);
+Function S8         S8ListS8FromIndex            (S8List list, size_t index);
+Function Bool       S8ListHasS8                  (S8List list, S8 string, MatchFlags flags);
+Function S8         S8ListJoin                   (M_Arena *arena, S8List list);
+Function S8         S8ListJoinFormatted          (M_Arena *arena, S8List list, S8ListJoinFormat join);
+Function S8Node    *S8ListRemoveFirstOccurenceOf (S8List *list, S8 string, MatchFlags flags);
+Function void       S8ListRemoveAllOccurencesOf  (S8List *list, S8 string, MatchFlags flags);
+Function void       S8ListRemoveExplicit         (S8List *list, S8Node *string);
+Function S8List     S8ListFromS8Split            (M_Arena *arena, S8 string, S8 delimiter, MatchFlags flags);
+
+#define S8ListForEach(L, V) S8Node *(V) = (L).first; 0 != (V); (V) = (V)->next
+
+Function void S8ListRecalculate (S8List *list);
+
+//~NOTE(tbt): compression
+
+#if Build_ZLib
+Function S8 S8Deflate (M_Arena *arena, S8 string);
+Function S8 S8Inflate (M_Arena *arena, S8 string);
+#endif
 
 //~NOTE(tbt): serialisation/deserialisation
 
 // NOTE(tbt): read their respective types from a binary string and advance the input string
 
-#define S8ReadType(T, S) (((S).len > 0) ? (*((T *)((S).buffer))) : (T){0})
+#define S8ReadType(T, S) (((S).len >= sizeof(T)) ? (*((T *)((S).buffer))) : (T){0})
 Function uint8_t  S8DeserialiseU8  (S8 *data);
 Function uint16_t S8DeserialiseU16 (S8 *data);
 Function uint32_t S8DeserialiseU32 (S8 *data);
@@ -193,5 +238,5 @@ Function V3F      S8Deserialise3F  (S8 *data);
 Function V4F      S8Deserialise4F  (S8 *data);
 
 Function void S8SerialiseBytes (S8 *data, void *src, size_t bytes);
-#define S8SerialiseType(T, S, V) Statement( if((S)->len > sizeof(T)) { *((T *)((S)->buffer)) = (V); *(S) = S8Advance(*(S), sizeof(T)); } )
+#define S8SerialiseType(T, S, V) Statement( if((S)->len >= sizeof(T)) { *((T *)((S)->buffer)) = (V); S8Advance((S), sizeof(T)); } )
 #define S8SerialiseStruct(S, V) Statement( S8SerialiseBytes((S), &(V), sizeof(V)); )

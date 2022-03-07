@@ -2,15 +2,15 @@ Function void
 W32_AssertLogCallback(char *title, char *msg)
 {
     ConsoleOutputFmt("%s\n", msg);
-    MessageBoxA(NULL, msg, title, MB_ICONERROR | MB_OK);
+    MessageBoxA(0, msg, title, MB_ICONERROR | MB_OK);
 }
 
 Function void
-OSInit(void)
+OS_Init(void)
 {
     // NOTE(tbt): weird COM stuff
-    CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-    OleInitialize(NULL);
+    CoInitializeEx(0, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+    OleInitialize(0);
     
     // NOTE(tbt): initialise time stuff
     LARGE_INTEGER perf_counter_frequency;
@@ -28,7 +28,7 @@ OSInit(void)
     Persist TC_Data main_thread_context;
     TC_Make(&main_thread_context, 0);
     TC_Set(&main_thread_context);
-    w32_threads_count = CreateSemaphoreW(NULL, 0, INT_MAX, NULL);
+    w32_threads_count = CreateSemaphoreW(0, 0, INT_MAX, 0);
     
     // NOTE(tbt): initialise console
 #if Build_ModeDebug
@@ -37,11 +37,11 @@ OSInit(void)
     assert_log = W32_AssertLogCallback;
     
     // NOTE(tbt): initialise RNG
-    RandIntInit(EntropyGet(), ITL_Increment);
+    RandIntInit(IntFromEntropy());
 }
 
 Function void
-OSCleanup(void)
+OS_Cleanup(void)
 {
     if(w32_t_is_granular)
     {

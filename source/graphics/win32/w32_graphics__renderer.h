@@ -4,7 +4,7 @@ struct W32_Sprite
 {
     R_Sprite parent;
     W32_Sprite *free_list_next;
-    ID3D11Texture2D *texture; // NOTE(tbt): normally NULL for immutable sprite
+    ID3D11Texture2D *texture; // NOTE(tbt): normally 0 for immutable sprite
     ID3D11ShaderResourceView *texture_view;
 };
 
@@ -13,6 +13,14 @@ Global W32_Sprite w32_sprite_nil =
     .parent.dimensions = { 1, 1, },
     .free_list_next = &w32_sprite_nil,
 };
+
+typedef struct
+{
+    Semaphore lock;
+    M_Arena arena;
+    W32_Sprite *free_list;
+} W32_SpriteAllocator;
+Global W32_SpriteAllocator w32_sprite_allocator = {0};
 
 Function W32_Sprite *W32_SpriteAllocate (void);
 Function void        W32_SpriteFree     (W32_Sprite *sprite);
@@ -32,8 +40,6 @@ typedef struct
 
 typedef struct
 {
-    M_Arena sprite_arena;
-    W32_Sprite *sprite_free_list;
     W32_Shader default_shader;
     W32_UniformBuffer uniforms;
     ID3D11Buffer *uniform_buffer;

@@ -1,3 +1,4 @@
+
 Function uint64_t
 W32_U64FromHiAndLoWords(DWORD hi,
                         DWORD lo)
@@ -7,7 +8,6 @@ W32_U64FromHiAndLoWords(DWORD hi,
     result |= ((uint64_t)lo) <<  0;
     return result;
 }
-
 
 Function S16
 W32_FileOpListFromS8List(M_Arena *arena, S8List list)
@@ -52,5 +52,24 @@ W32_S8ListFromWin32StringList(M_Arena *arena,
             S8ListAppendExplicit(&result, node);
         }
     }
+    return result;
+}
+
+Function S16
+W32_FormatLastError(S16 function)
+{
+    DWORD dw = GetLastError(); 
+    
+    void *buffer;
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+                  FORMAT_MESSAGE_FROM_SYSTEM |
+                  FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL,
+                  dw,
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPTSTR) &buffer,
+                  0, NULL );
+    
+    S16 result = CStringAsS16(buffer);
     return result;
 }

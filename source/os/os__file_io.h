@@ -29,10 +29,10 @@ Function Bool F_WriteEntire    (S8 filename, S8 data);
 
 //~NOTE(tbt): file management
 
-Function Bool F_Delete          (S8 filename);                  // NOTE(tbt): deletes a single file
-Function Bool F_Move            (S8 filename, S8 new_filename); // NOTE(tbt): renames or moves a file or directory
-Function Bool F_DirectoryMake   (S8 filename);                  // NOTE(tbt): creates an empty directory
-Function Bool F_DirectoryDelete (S8 filename);                  // NOTE(tbt): deletes an empty directory
+Function Bool F_Destroy          (S8 filename);                  // NOTE(tbt): deletes a single file
+Function Bool F_Move             (S8 filename, S8 new_filename); // NOTE(tbt): renames or moves a file or directory
+Function Bool F_DirectoryMake    (S8 filename);                  // NOTE(tbt): creates an empty directory
+Function Bool F_DirectoryDestroy (S8 filename);                  // NOTE(tbt): deletes an empty directory
 
 //~NOTE(tbt): directory iteration
 
@@ -84,8 +84,16 @@ Function S8   AbsolutePathFromRelativePath (M_Arena *arena, S8 path);
 //~NOTE(tbt): directory change notifications
 
 typedef void *F_ChangeHandle;
-enum { F_ChangeHandleWait_Infinite = ~((size_t)0), };
+typedef enum
+{
+    F_ChangeHandleTimeout_Infinite = ~((size_t)0),
+} F_ChangeHandleTimeout;
 
 Function F_ChangeHandle F_ChangeHandleMake    (S8 filename, Bool recursive);
-Function Bool           F_ChangeHandleWait    (F_ChangeHandle handle, size_t timeout);
+Function Bool           F_ChangeHandleWait    (F_ChangeHandle handle, F_ChangeHandleTimeout milliseconds);
 Function void           F_ChangeHandleDestroy (F_ChangeHandle handle);
+
+
+//~NOTE(tbt): error string
+
+Function S8 F_LastErrorStringGet (M_Arena *arena);

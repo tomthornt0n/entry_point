@@ -8,13 +8,20 @@
 // non-native version will be less than optimal.
 
 //-----------------------------------------------------------------------------
+
+#include <stdint.h>
+
 // Platform-specific functions and macros
 
-// Microsoft Visual Studio
 
 #if defined(_MSC_VER)
+# define FORCE_INLINE __forceinline
+#else
+# define FORCE_INLINE inline __attribute__((always_inline))
+#endif
 
-#define FORCE_INLINE	__forceinline
+
+#if defined(_MSC_VER) && !Build_NoCRT
 
 #include <stdlib.h>
 
@@ -27,19 +34,17 @@
 
 #else	// defined(_MSC_VER)
 
-#define	FORCE_INLINE inline __attribute__((always_inline))
-
-inline uint32_t rotl32 ( uint32_t x, int8_t r )
+static uint32_t rotl32 ( uint32_t x, int8_t r )
 {
     return (x << r) | (x >> (32 - r));
 }
 
-inline uint64_t rotl64 ( uint64_t x, int8_t r )
+static uint64_t rotl64 ( uint64_t x, int8_t r )
 {
     return (x << r) | (x >> (64 - r));
 }
 
-#define	ROTL32(x,y)	rotl32(x,y)
+#define ROTL32(x,y)	rotl32(x,y)
 #define ROTL64(x,y)	rotl64(x,y)
 
 #define BIG_CONSTANT(x) (x##LLU)

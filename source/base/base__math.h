@@ -1,7 +1,7 @@
 
 //~NOTE(tbt): single floats
 
-Function Bool  IsNan1F                  (float a);
+Function Bool  IsNaN1F                  (float a);
 Function float Smoothstep1F             (float t);
 Function float InterpolateLinear1F      (float a, float b, float t);
 Function float InterpolateExponential1F (float a, float b, float t);
@@ -33,8 +33,7 @@ typedef union
         float y;
     };
     float elements[2];
-} Vector2F;
-typedef Vector2F V2F;
+} V2F;
 #define V2F(...) ((V2F){ __VA_ARGS__ })
 
 typedef union
@@ -52,8 +51,7 @@ typedef union
         float b;
     };
     float elements[3];
-} Vector3F;
-typedef Vector3F V3F;
+} V3F;
 #define V3F(...) ((V3F){ __VA_ARGS__ })
 
 typedef union
@@ -73,8 +71,7 @@ typedef union
         float a;
     };
     float elements[4];
-} Vector4F;
-typedef Vector4F V4F;
+} V4F;
 #define V4F(...) ((V4F){ __VA_ARGS__ })
 #define Col(R, G, B, A) V4F((R)*(A), (G)*(A), (B)*(A), (A))
 
@@ -90,7 +87,6 @@ Function float Length4F        (V4F a);
 Function V4F   Normalise4F     (V4F a);
 Function V4F   Mins4F          (V4F a, V4F b);
 Function V4F   Maxs4F          (V4F a, V4F b);
-Function V4F   SetAlpha4F      (V4F col, float a);
 
 Function V3F   U3F             (float a);
 Function V3F   Add3F           (V3F a, V3F b);
@@ -98,13 +94,13 @@ Function V3F   Sub3F           (V3F a, V3F b);
 Function V3F   Mul3F           (V3F a, V3F b);
 Function V3F   Div3F           (V3F a, V3F b);
 Function float Dot3F           (V3F a, V3F b);
-Function V3F   Cross3F         (V3F a, V3F b);
 Function V3F   Scale3F         (V3F a, float b);
 Function float LengthSquared3F (V3F a);
 Function float Length3F        (V3F a);
 Function V3F   Normalise3F     (V3F a);
 Function V3F   Mins3F          (V3F a, V3F b);
 Function V3F   Maxs3F          (V3F a, V3F b);
+Function V3F   Cross3F         (V3F a, V3F b);
 
 Function V2F   U2F             (float a);
 Function V2F   Add2F           (V2F a, V2F b);
@@ -131,8 +127,7 @@ typedef union
         V4F r_3;
     };
     float elements[4][4];
-} Matrix4x4F;
-typedef Matrix4x4F M4x4F;
+} M4x4F;
 
 Function M4x4F InitialiseDiagonal4x4F (float diag);
 Function M4x4F Mul4x4F                (M4x4F a, M4x4F b);
@@ -164,8 +159,7 @@ typedef union
         int y;
     };
     int elements[2];
-} Vector2I;
-typedef Vector2I V2I;
+} V2I;
 #define V2I(...) ((V2I){ __VA_ARGS__ })
 
 typedef union
@@ -177,8 +171,7 @@ typedef union
         int z;
     };
     int elements[3];
-} Vector3I;
-typedef Vector3I V3I;
+} V3I;
 #define V3I(...) ((V3I){ __VA_ARGS__ })
 
 typedef union
@@ -191,16 +184,17 @@ typedef union
         int w;
     };
     int elements[4];
-} Vector4I;
-typedef Vector4I V4I;
+} V4I;
 #define V4I(...) ((V4I){ __VA_ARGS__ })
 
-Function V4I U4I     (int a);
-Function V4I Add4I   (V4I a, V4I b);
-Function V4I Sub4I   (V4I a, V4I b);
-Function V4I Mul4I   (V4I a, V4I b);
-Function V4I Div4I   (V4I a, V4I b);
-Function int Dot4I   (V4I a, V4I b);
+Function V4I U4I             (int a);
+Function V4I Add4I           (V4I a, V4I b);
+Function V4I Sub4I           (V4I a, V4I b);
+Function V4I Mul4I           (V4I a, V4I b);
+Function V4I Div4I           (V4I a, V4I b);
+Function int Dot4I           (V4I a, V4I b);
+Function int LengthSquared4I (V4I a);
+Function int Length4I        (V4I a);
 
 Function V3I U3I     (int a);
 Function V3I Add3I   (V3I a, V3I b);
@@ -209,6 +203,8 @@ Function V3I Mul3I   (V3I a, V3I b);
 Function V3I Div3I   (V3I a, V3I b);
 Function int Dot3I   (V3I a, V3I b);
 Function V3I Cross3I (V3I a, V3I b);
+Function int LengthSquared3I (V3I a);
+Function int Length3I        (V3I a);
 
 Function V2I U2I     (int a);
 Function V2I Add2I   (V2I a, V2I b);
@@ -216,6 +212,8 @@ Function V2I Sub2I   (V2I a, V2I b);
 Function V2I Mul2I   (V2I a, V2I b);
 Function V2I Div2I   (V2I a, V2I b);
 Function int Dot2I   (V2I a, V2I b);
+Function int LengthSquared2I (V2I a);
+Function int Length2I        (V2I a);
 
 //~NOTE(tbt): single unsigned integers
 
@@ -234,8 +232,7 @@ typedef union
     };
     float elements[2];
     V2F v;
-} Interval1F;
-typedef Interval1F I1F;
+} I1F;
 #define I1F(...) ((I1F){ __VA_ARGS__ })
 
 static Bool  IntervalHasValue1F (I1F a, float b);
@@ -254,8 +251,7 @@ typedef union
         size_t mark;
     };
     size_t elements[2];
-} Interval1U;
-typedef Interval1U I1U;
+} I1U;
 #define I1U(...) ((I1U){ __VA_ARGS__ })
 
 typedef union
@@ -267,8 +263,7 @@ typedef union
     };
     int elements[2];
     V2I v;
-} Interval1I;
-typedef Interval1I I1I;
+} I1I;
 #define I1I(...) ((I1I){ __VA_ARGS__ })
 
 typedef union
@@ -292,12 +287,11 @@ typedef union
     };
     V2F points[2];
     float elements[4];
-} Interval2F;
-typedef Interval2F I2F;
+} I2F;
 #define I2F(...) ((I2F){ __VA_ARGS__ })
 
 Function I2F  RectMake2F         (V2F pos, V2F dimensions);
-Function I2F  Expand2F           (I2F a, float b);
+Function I2F  Expand2F           (I2F a, V2F b);
 Function Bool SAT2F              (I2F a, I2F b);
 Function Bool IntervalHasValue2F (I2F a, V2F b);
 Function V2F  Centre2F           (I2F a);
@@ -317,7 +311,7 @@ typedef union
         uint8_t a;
     };
 } Pixel;
-#define Pixel(...) ((Pixel){__VA_ARGS__})
+#define Pixel(...) ((Pixel){ __VA_ARGS__ })
 
 Function V4F HSVFromRGB (V4F col);
 Function V4F RGBFromHSV (V4F col);

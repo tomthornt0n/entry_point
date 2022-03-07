@@ -1,3 +1,4 @@
+
 typedef struct
 {
     unsigned short msec; // NOTE(tbt): milliseconds after the seconds, [0, 999]
@@ -6,7 +7,7 @@ typedef struct
     unsigned char hour;  // NOTE(tbt): hours into the day, [0, 23]
     unsigned char day;   // NOTE(tbt): days into the month, [0, 30]
     unsigned char mon;   // NOTE(tbt): months into the year, [0, 11]
-    signed short year;   // NOTE(tbt): ... ; -1 == -2 BCE; 0 == -1 BCE; 1 == 1 CE, 2 == 2 CE; ...
+    signed short year;   // NOTE(tbt): ...  -1 == -2 BCE; 0 == -1 BCE; 1 == 1 CE, 2 == 2 CE; ...
 } T_DateTime;
 
 typedef uint64_t T_DenseTime;

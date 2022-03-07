@@ -1,3 +1,4 @@
+
 static S8
 I_S8FromKey(I_Key key)
 {
@@ -5,7 +6,7 @@ I_S8FromKey(I_Key key)
     
     static S8 strings[I_Key_MAX + 1] =
     {
-#define KeyDef(name, string) { .buffer = string, .len = sizeof(string) - 1 },
+#define KeyDef(NAME, STRING, IS_REAL) S8Initialiser(STRING),
 #include "graphics__keylist.h"
     };
     

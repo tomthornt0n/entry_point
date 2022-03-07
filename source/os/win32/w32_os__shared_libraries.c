@@ -1,11 +1,11 @@
 #define SharedLibExport __declspec(dllexport)
 
 Function SharedLib
-SharedLibLoad(S8 filename)
+SharedLibMake(S8 filename)
 {
     SharedLib result;
     
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     
     Assert(sizeof(SharedLib) == sizeof(HMODULE));
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
@@ -17,9 +17,9 @@ SharedLibLoad(S8 filename)
 }
 
 Function void *
-SharedLibGet(SharedLib lib, char *symbol)
+SharedLibSymbolGet(SharedLib lib, char *symbol)
 {
-    Assert(NULL != lib);
+    Assert(0 != lib);
     void *result;
     HMODULE module = (HMODULE)lib;
     FARPROC fn = GetProcAddress(module, symbol);
@@ -28,9 +28,9 @@ SharedLibGet(SharedLib lib, char *symbol)
 }
 
 Function void
-SharedLibUnload(SharedLib lib)
+SharedLibDestroy(SharedLib lib)
 {
-    Assert(NULL != lib);
+    Assert(0 != lib);
     HMODULE module = (HMODULE)lib;
     FreeLibrary(module);
 }

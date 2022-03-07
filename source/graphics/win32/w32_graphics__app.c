@@ -3,10 +3,10 @@ Function void
 G_Init(void)
 {
     //-NOTE(tbt): initialise OS layer
-    OSInit();
+    OS_Init();
     
     //-NOTE(tbt): get instance handle (not passed in to wWinMain if building without CRT)
-    w32_g_app.instance_handle = GetModuleHandle(NULL);
+    w32_g_app.instance_handle = GetModuleHandle(0);
     
     //-NOTE(tbt): register the class for windows to use
     WNDCLASSW window_class = 
@@ -15,22 +15,25 @@ G_Init(void)
         .lpfnWndProc = W32_WindowProc,
         .hInstance = w32_g_app.instance_handle,
         .lpszClassName = W32_WindowClassName,
-        .hCursor = LoadCursor(NULL, IDC_ARROW),
+        .hCursor = LoadCursor(0, IDC_ARROW),
     };
     RegisterClassW(&window_class);
     
     //-NOTE(tbt): setup D3D11 device
-    UINT flags = Build_ModeDebug*D3D11_CREATE_DEVICE_DEBUG;
+    UINT flags = D3D11_CREATE_DEVICE_SINGLETHREADED;
+#if Build_ModeDebug
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
     D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_0 };
-    D3D11CreateDevice(NULL,
+    D3D11CreateDevice(0,
                       D3D_DRIVER_TYPE_HARDWARE,
-                      NULL,
+                      0,
                       flags,
                       levels,
                       ArrayCount(levels),
                       D3D11_SDK_VERSION,
                       &w32_g_app.device,
-                      NULL,
+                      0,
                       &w32_g_app.device_ctx);
     
     //-NOTE(tbt): D3D11 debugging
@@ -43,6 +46,7 @@ G_Init(void)
 #endif
     
     //-NOTE(tbt): nil sprite
+    w32_sprite_allocator.lock = SemaphoreMake(1);
     Pixel nil_sprite_data = { 0xffffffff };
     D3D11_TEXTURE2D_DESC nil_sprite_texture_desc =
     {
@@ -66,13 +70,9 @@ G_Init(void)
                                  &nil_sprite_subresource_data,
                                  &nil_sprite_texture);
     ID3D11Device_CreateShaderResourceView(w32_g_app.device,
-                                          (ID3D11Resource*)nil_sprite_texture, NULL,
+                                          (ID3D11Resource*)nil_sprite_texture, 0,
                                           &w32_sprite_nil.texture_view);
     ID3D11Texture2D_Release(nil_sprite_texture);
-    
-    //-NOTE(tbt): sprite allocator
-    w32_r_data.sprite_arena = M_ArenaMake(m_default_hooks);
-    w32_r_data.sprite_free_list = &w32_sprite_nil;
     
     //-NOTE(tbt): default shader
 #include "..\build\w32__vshader.h"
@@ -86,10 +86,10 @@ G_Init(void)
     ID3D11Device_CreateVertexShader(w32_g_app.device,
                                     d3d11_vshader,
                                     sizeof(d3d11_vshader),
-                                    NULL, &w32_r_data.default_shader.vertex_shader);
+                                    0, &w32_r_data.default_shader.vertex_shader);
     ID3D11Device_CreatePixelShader(w32_g_app.device,
                                    d3d11_pshader, sizeof(d3d11_pshader),
-                                   NULL, &w32_r_data.default_shader.pixel_shader);
+                                   0, &w32_r_data.default_shader.pixel_shader);
     ID3D11Device_CreateInputLayout(w32_g_app.device,
                                    input_layout_desc,
                                    ArrayCount(input_layout_desc),
@@ -106,7 +106,7 @@ G_Init(void)
     };
     ID3D11Device_CreateBuffer(w32_g_app.device,
                               &uniform_buffer_desc,
-                              NULL,
+                              0,
                               &w32_r_data.uniform_buffer);
     
     //-NOTE(tbt): vertex buffer
@@ -119,7 +119,7 @@ G_Init(void)
     };
     ID3D11Device_CreateBuffer(w32_g_app.device,
                               &vertex_buffer_desc,
-                              NULL,
+                              0,
                               &w32_r_data.vertex_buffer);
     
     //-NOTE(tbt): index buffer
@@ -132,7 +132,7 @@ G_Init(void)
     };
     ID3D11Device_CreateBuffer(w32_g_app.device,
                               &index_buffer_desc,
-                              NULL,
+                              0,
                               &w32_r_data.index_buffer);
     
     //-NOTE(tbt): texture sampler
@@ -199,6 +199,7 @@ G_WindowOpen(S8 title,
              V2I dimensions,
              G_AppHooks hooks)
 {
+    
     //-NOTE(tbt): allocate and make window
     M_Arena arena = M_ArenaMake(m_default_hooks);
     W32_WindowNode *result = M_ArenaPush(&arena, sizeof(*result));
@@ -208,9 +209,9 @@ G_WindowOpen(S8 title,
     W32_WindowMake(&result->w, title, dimensions, hooks.draw);
     
     //-NOTE(tbt): append to app windows list
-    if(NULL == w32_g_app.windows_last)
+    if(0 == w32_g_app.windows_last)
     {
-        Assert(NULL == w32_g_app.windows_first);
+        Assert(0 == w32_g_app.windows_first);
         w32_g_app.windows_first = result;
         w32_g_app.windows_last = result;
     }
@@ -235,7 +236,7 @@ Function void
 W32_WindowNodeRemove(W32_WindowNode *w)
 {
     //-NOTE(tbt): remove from windows list
-    if(NULL == w->prev)
+    if(0 == w->prev)
     {
         w32_g_app.windows_first = w->next;
     }
@@ -243,7 +244,7 @@ W32_WindowNodeRemove(W32_WindowNode *w)
     {
         w->prev->next = w->next;
     }
-    if(NULL == w->next)
+    if(0 == w->next)
     {
         w32_g_app.windows_last = w->prev;
     }
@@ -277,17 +278,17 @@ G_WindowsNextGet(W_Handle current)
 Function void
 G_MainLoop(void)
 {
-    while(NULL != w32_g_app.windows_first)
+    while(0 != w32_g_app.windows_first)
     {
         if(w32_g_app.should_block_to_wait_for_events && !w32_g_app.should_force_next_update)
         {
             WaitMessage();
-            w32_g_app.should_force_next_update = False;
         }
+        ITL_Exchange((int volatile *)&w32_g_app.should_force_next_update, False);
         
-        W32_WindowNode *next = NULL;
+        W32_WindowNode *next = 0;
         for(W32_WindowNode *w = w32_g_app.windows_first;
-            NULL != w;
+            0 != w;
             w = next)
         {
             next = w->next;
@@ -304,28 +305,40 @@ G_MainLoop(void)
 Function void
 G_Cleanup(void)
 {
-    W32_WindowNode *next = NULL;
+    W32_WindowNode *next = 0;
     for(W32_WindowNode *w = w32_g_app.windows_first;
-        NULL != w;
+        0 != w;
         w = next)
     {
         w->cleanup(w);
         W32_WindowNodeRemove(w);
     }
-    OSCleanup();
+    OS_Cleanup();
 }
 
-Function Bool *
-G_ShouldBlockToWaitForEvents(void)
+Function Bool
+G_ShouldBlockToWaitForEventsGet(void)
 {
-    Bool *result = &w32_g_app.should_block_to_wait_for_events;
+    Bool result = w32_g_app.should_block_to_wait_for_events;
     return result;
+}
+
+Function void
+G_ShouldBlockToWaitForEventsSet(Bool should_block_to_wait_for_events)
+{
+    w32_g_app.should_block_to_wait_for_events = should_block_to_wait_for_events;
 }
 
 Function void
 G_ForceNextUpdate(void)
 {
-    w32_g_app.should_force_next_update = True;
+    if(!ITL_CompareExchange((int volatile *)&w32_g_app.should_force_next_update, True, False))
+    {
+        for(W32_WindowNode *w = w32_g_app.windows_first; 0 != w; w = w->next)
+        {
+            RedrawWindow(w->w.window_handle, 0, 0, 0);
+        }
+    }
 }
 
 Function W_Handle

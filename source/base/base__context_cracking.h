@@ -110,7 +110,6 @@
 //-NOTE(tbt): architecture
 #if defined(Build_ArchX64)
 # define Build_UseSSE2 1
-# define Build_UseSSE3 1 // TODO(tbt): don't just assume all x64 cpus have SSE3 (although this shouldn't really be an problem)
 # include <emmintrin.h>
 # include <immintrin.h>
 #else
@@ -148,4 +147,7 @@
 #endif
 #if !defined(Build_EnableAsserts)
 # define Build_EnableAsserts 0
+#endif
+#if !defined(Build_ZLib)
+# define Build_ZLib 0
 #endif

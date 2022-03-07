@@ -21,8 +21,8 @@ typedef struct
     
     W32_WindowNode *current_window;
     
-    Bool should_block_to_wait_for_events;
-    Bool should_force_next_update;
+    volatile Bool should_block_to_wait_for_events;
+    volatile Bool should_force_next_update;
 } W32_GraphicalApp;
 Global W32_GraphicalApp w32_g_app = {0};
 

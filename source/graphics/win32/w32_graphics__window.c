@@ -2,7 +2,7 @@
 Function void
 W32_WindowMake(W32_Window *window, S8 title, V2I dimensions, W_DrawHook draw)
 {
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     
     window->frame_arena = M_ArenaMake(m_default_hooks);
     window->events = EV_QueueMake();
@@ -21,16 +21,16 @@ W32_WindowMake(W32_Window *window, S8 title, V2I dimensions, W_DrawHook draw)
                                             CW_USEDEFAULT, CW_USEDEFAULT,
                                             window_rect.right - window_rect.left,
                                             window_rect.bottom - window_rect.top,
-                                            NULL, NULL, w32_g_app.instance_handle,
-                                            NULL);
+                                            0, 0, w32_g_app.instance_handle,
+                                            0);
     SetWindowLongPtrW(window->window_handle, GWLP_USERDATA, IntFromPtr(window));
     
     //-NOTE(tbt): setup D3D11 swapchain
-    IDXGIFactory2 *dxgi_factory = NULL;
+    IDXGIFactory2 *dxgi_factory = 0;
     {
-        IDXGIDevice *dxgi_device = NULL;
+        IDXGIDevice *dxgi_device = 0;
         ID3D11Device_QueryInterface(w32_g_app.device, &IID_IDXGIDevice, &dxgi_device);
-        IDXGIAdapter *dxgi_adapter = NULL;
+        IDXGIAdapter *dxgi_adapter = 0;
         IDXGIDevice_GetAdapter(dxgi_device, &dxgi_adapter);
         IDXGIAdapter_GetParent(dxgi_adapter, &IID_IDXGIFactory, &dxgi_factory);
         IDXGIAdapter_Release(dxgi_adapter);
@@ -51,7 +51,7 @@ W32_WindowMake(W32_Window *window, S8 title, V2I dimensions, W_DrawHook draw)
                                          (IUnknown *)w32_g_app.device,
                                          window->window_handle,
                                          &swap_chain_desc,
-                                         NULL, NULL, &window->swap_chain);
+                                         0, 0, &window->swap_chain);
     IDXGIFactory2_Release(dxgi_factory);
     
     //-NOTE(tbt): show native window
@@ -115,6 +115,7 @@ W32_WindowProc(HWND window_handle,
                 .modifiers = modifiers,
                 .key = I_Key_MouseButtonLeft,
                 .is_down = (WM_LBUTTONDOWN == message),
+                .position = W_MousePositionGet(w),
             };
             EV_QueuePush(&w->events, event);
             w->is_key_down[event.key] = event.is_down;
@@ -171,18 +172,22 @@ W32_WindowProc(HWND window_handle,
                 .modifiers = modifiers,
                 .position = W_MousePositionGet(w),
             };
+            V2F delta = Sub2F(event.position, w->mouse_position);
+            event.size = V2I(delta.x + 0.5f, delta.y + 0.5f);
             EV_QueuePush(&w->events, event);
+            
+            w->mouse_position = event.position;
             
             if(!is_mouse_hover_active)
             {
                 is_mouse_hover_active = True;
-                TRACKMOUSEEVENT track_mouse_event = {0};
+                TRACKMOUSEEVENT track_mouse_event =
                 {
-                    track_mouse_event.cbSize = sizeof(track_mouse_event);
-                    track_mouse_event.dwFlags = TME_LEAVE;
-                    track_mouse_event.hwndTrack = window_handle;
-                    track_mouse_event.dwHoverTime = HOVER_DEFAULT;
-                }
+                    .cbSize = sizeof(track_mouse_event),
+                    .dwFlags = TME_LEAVE,
+                    .hwndTrack = window_handle,
+                    .dwHoverTime = HOVER_DEFAULT,
+                };
                 TrackMouseEvent(&track_mouse_event);
             }
         } break;
@@ -190,7 +195,7 @@ W32_WindowProc(HWND window_handle,
         case(WM_MOUSELEAVE):
         {
             is_mouse_hover_active = False;
-            SetCursor(LoadCursorW(NULL, IDC_ARROW));
+            SetCursor(LoadCursorW(0, IDC_ARROW));
             EV_Data event =
             {
                 .kind = EV_Kind_MouseLeave,
@@ -243,17 +248,17 @@ W32_WindowProc(HWND window_handle,
                     
                     case(W_CursorKind_HResize):
                     {
-                        SetCursor(LoadCursorW(NULL, IDC_SIZEWE));
+                        SetCursor(LoadCursorW(0, IDC_SIZEWE));
                     } break;
                     
                     case(W_CursorKind_VResize):
                     {
-                        SetCursor(LoadCursorW(NULL, IDC_SIZENS));
+                        SetCursor(LoadCursorW(0, IDC_SIZENS));
                     } break;
                     
                     case(W_CursorKind_Default):
                     {
-                        SetCursor(LoadCursorW(NULL, IDC_ARROW));
+                        SetCursor(LoadCursorW(0, IDC_ARROW));
                     } break;
                     
                     case(W_CursorKind_Hidden):
@@ -290,7 +295,7 @@ W32_WindowProc(HWND window_handle,
             EV_QueuePush(&w->events, event);
             w->dimensions = window_dimensions;
             
-            if(NULL != w->backbuffer_render_target_view)
+            if(0 != w->backbuffer_render_target_view)
             {
                 ID3D11DeviceContext_ClearState(w32_g_app.device_ctx);
                 ID3D11RenderTargetView_Release(w->backbuffer_render_target_view);
@@ -298,11 +303,11 @@ W32_WindowProc(HWND window_handle,
                 ID3D11RenderTargetView_Release(w->depth_stencil_view);
                 ID3D11Resource_Release(w->backbuffer_render_target_texture);
                 ID3D11Resource_Release(w->render_target_texture);
-                w->backbuffer_render_target_view = NULL;
-                w->render_target_view = NULL;
-                w->depth_stencil_view = NULL;
-                w->backbuffer_render_target_texture = NULL;
-                w->render_target_texture = NULL;
+                w->backbuffer_render_target_view = 0;
+                w->render_target_view = 0;
+                w->depth_stencil_view = 0;
+                w->backbuffer_render_target_texture = 0;
+                w->render_target_texture = 0;
             }
             if(window_dimensions.x > 0 &&
                window_dimensions.y > 0)
@@ -337,7 +342,7 @@ W32_WindowProc(HWND window_handle,
                 ID3D11Texture2D *render_target;
                 ID3D11Device_CreateTexture2D(w32_g_app.device,
                                              &render_target_texture_desc,
-                                             NULL, &render_target);
+                                             0, &render_target);
                 w->render_target_texture = (ID3D11Resource *)render_target;
                 ID3D11Device_CreateRenderTargetView(w32_g_app.device,
                                                     w->render_target_texture,
@@ -378,11 +383,11 @@ W32_WindowProc(HWND window_handle,
                 };
                 ID3D11Texture2D *depth_stencil;
                 ID3D11Device_CreateTexture2D(w32_g_app.device,
-                                             &depth_stencil_texture_desc, NULL,
+                                             &depth_stencil_texture_desc, 0,
                                              &depth_stencil);
                 ID3D11Device_CreateDepthStencilView(w32_g_app.device,
                                                     (ID3D11Resource*)depth_stencil,
-                                                    NULL, &w->depth_stencil_view);
+                                                    0, &w->depth_stencil_view);
                 ID3D11Texture2D_Release(depth_stencil);
                 
                 //-NOTE(tbt): projection
@@ -585,10 +590,9 @@ W32_WindowProc(HWND window_handle,
 Function void
 W32_WindowDraw(W32_Window *w)
 {
-    if(NULL != w->draw && NULL != w->render_target_view)
+    if(0 != w->draw && 0 != w->render_target_view)
     {
         M_ArenaClear(&w->frame_arena);
-        w->r_cmd_queue.cmds_count = 0;
         R_CmdQueueRecordingBegin(&w->r_cmd_queue);
         w->draw(w);
         R_CmdQueueRecordingEnd(&w->r_cmd_queue);
@@ -606,7 +610,8 @@ W_Update(W_Handle window)
 {
     W32_Window *w = window;
     
-    w->frame_start = T_SecondsGet();
+    w->frame_start = w->frame_end;
+    w->frame_end = T_SecondsGet();
     
     EV_QueueClear(&w->events);
     
@@ -619,6 +624,8 @@ W_Update(W_Handle window)
     
     W32_WindowDraw(w);
     
+    // TODO(tbt): swap buffer on all windows all together at end of main loop
+    
     HRESULT hr = IDXGISwapChain_Present(w->swap_chain, w->is_vsync ? 1 : 0, 0);
     Assert_(!FAILED(hr), "Failed to present swapchain. Device lost?");
     if(DXGI_STATUS_OCCLUDED == hr)
@@ -628,7 +635,6 @@ W_Update(W_Handle window)
         Sleep(10);
     }
     
-    w->frame_end = T_SecondsGet();
     
     Bool result = !w->should_close;
     return result;
@@ -682,6 +688,25 @@ W_KeyStateGet(W_Handle window, I_Key key)
     return result;
 }
 
+Function I_Modifiers
+W_ModifiersMaskGet(W_Handle window)
+{
+    I_Modifiers result = {0};
+    if(W_KeyStateGet(window, I_Key_Ctrl))
+    {
+        result |= I_Modifiers_Ctrl;
+    }
+    if(W_KeyStateGet(window, I_Key_Alt))
+    {
+        result |= I_Modifiers_Alt;
+    }
+    if(W_KeyStateGet(window, I_Key_Shift))
+    {
+        result |= I_Modifiers_Shift;
+    }
+    return result;
+}
+
 Function void
 W_FullscreenSet(W_Handle window, Bool is_fullscreen)
 {
@@ -731,6 +756,14 @@ W_CursorKindSet(W_Handle window, W_CursorKind kind)
 {
     W32_Window *w = window;
     w->cursor_kind = kind;
+}
+
+Function double
+W_FrameTimeGet(W_Handle window)
+{
+    W32_Window *w = window;
+    double result = w->frame_end - w->frame_start;
+    return result;
 }
 
 Function M_Arena *

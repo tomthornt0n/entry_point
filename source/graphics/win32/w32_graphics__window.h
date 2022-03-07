@@ -31,6 +31,7 @@ struct W32_Window
     M4x4F projection_matrix;
     
     V2I dimensions;
+    V2F mouse_position;
     
     Bool is_key_down[I_Key_MAX];
 };

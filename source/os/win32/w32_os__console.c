@@ -14,9 +14,9 @@ W32_ConsoleInit(void)
 Function void
 ConsoleOutputS8(S8 string)
 {
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 string_s16 = S16FromS8(scratch.arena, string);
-    WriteConsoleW(w32_console_handle, string_s16.buffer, string_s16.len, NULL, NULL);
+    WriteConsoleW(w32_console_handle, string_s16.buffer, string_s16.len, 0, 0);
     OutputDebugStringW(string_s16.buffer);
     M_TempEnd(&scratch);
 }
@@ -24,7 +24,7 @@ ConsoleOutputS8(S8 string)
 Function void
 ConsoleOutputS16(S16 string)
 {
-    WriteConsoleW(w32_console_handle, string.buffer, string.len, NULL, NULL);
+    WriteConsoleW(w32_console_handle, string.buffer, string.len, 0, 0);
     OutputDebugStringW(string.buffer);
 }
 

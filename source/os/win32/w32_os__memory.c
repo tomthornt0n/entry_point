@@ -1,14 +1,12 @@
 
-//~NOTE(tbt): base memory
-
 Function void *
 M_Reserve(size_t size)
 {
-    return VirtualAlloc(NULL, size, MEM_RESERVE, PAGE_NOACCESS);
+    return VirtualAlloc(0, size, MEM_RESERVE, PAGE_NOACCESS);
 }
 
 Function void
-M_Release(void *memory)
+M_Release(void *memory, size_t size)
 {
     VirtualFree(memory, 0, MEM_RELEASE);
 }

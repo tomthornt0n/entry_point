@@ -8,12 +8,14 @@
 
 #include <windows.h>
 
+#include <commctrl.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <intrin.h>
 #include <shellapi.h>
 #include <shlobj_core.h>
 #include <shlwapi.h>
+#include <thumbcache.h>
 #include <timeapi.h>
 #include <wincrypt.h>
 

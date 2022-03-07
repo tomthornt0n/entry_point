@@ -10,6 +10,7 @@
 #include "os__shared_libraries.h"
 #include "os__thread.h"
 #include "os__clipboard.h"
+#include "os__work_queue.h"
 
 #if Build_NoCRT
 Function int APP_EntryPoint(void);

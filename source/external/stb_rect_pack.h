@@ -205,7 +205,7 @@ extern "C" {
 #ifdef STB_RECT_PACK_IMPLEMENTATION
 #ifndef STBRP_SORT
 #include <stdlib.h>
-#define STBRP_SORT qsort
+#define STBRP_SORT() qsort
 #endif
 
 #ifndef STBRP_ASSERT
@@ -521,7 +521,7 @@ static stbrp__findresult stbrp__skyline_pack_rectangle(stbrp_context *context, i
     return res;
 }
 
-static int STBRP__CDECL rect_height_compare(const void *a, const void *b)
+static int STBRP__CDECL rect_height_compare(const void *a, const void *b, void *arg)
 {
     const stbrp_rect *p = (const stbrp_rect *) a;
     const stbrp_rect *q = (const stbrp_rect *) b;
@@ -532,7 +532,7 @@ static int STBRP__CDECL rect_height_compare(const void *a, const void *b)
     return (p->w > q->w) ? -1 : (p->w < q->w);
 }
 
-static int STBRP__CDECL rect_original_order(const void *a, const void *b)
+static int STBRP__CDECL rect_original_order(const void *a, const void *b, void *arg)
 {
     const stbrp_rect *p = (const stbrp_rect *) a;
     const stbrp_rect *q = (const stbrp_rect *) b;

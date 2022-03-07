@@ -19,4 +19,5 @@ Function void     TC_Set  (TC_Data *ptr); // NOTE(tbt): sets the thread local co
 
 //~NOTE(tbt): wrappers and helpers
 
-Function M_Temp TC_ScratchGet (M_Arena *non_conflict[], int non_conflict_count);
+Function M_Temp   TC_ScratchGet      (M_Arena *non_conflict[], int non_conflict_count);
+Function M_Arena *TC_ArenaFromThread (void);

@@ -4,7 +4,7 @@
 // NOTE(tbt): stb rect pack (for stb truetype)
 
 #define STBRP_ASSERT(A) Assert(A)
-#define STBRP_SORT(B, N, W, C) QSort(B, N, W, C)
+#define STBRP_SORT(B, N, W, C) Sort(B, N, W, C, 0)
 #define STB_RECT_PACK_IMPLEMENTATION
 #include "external/stb_rect_pack.h"
 
@@ -13,7 +13,7 @@
 #if Build_NoCRT
 M_Arena r_arena_for_stb_truetype = {0};
 # define STBTT_malloc(X, U) (M_ArenaPush(&r_arena_for_stb_truetype, X))
-# define STBTT_free(X, U)   (NULL)
+# define STBTT_free(X, U)   (0)
 # define STBTT_ifloor(A)    ((int)Floor1F(A))
 # define STBTT_iceil(A)     ((int)Ceil1F(A))
 # define STBTT_sqrt(A)      (Sqrt1F(A))

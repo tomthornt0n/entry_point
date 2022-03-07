@@ -1,3 +1,4 @@
+
 Global DWORD w32_tc_id = 0;
 
 Function TC_Data *

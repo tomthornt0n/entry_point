@@ -505,6 +505,16 @@ S8Clone(M_Arena *arena, S8 string)
     return result;
 }
 
+Function S8
+S8CloneFL(M_FreeList *free_list, S8 string)
+{
+    S8 result;
+    result.len = string.len;
+    result.buffer = M_FreeListAlloc(free_list, string.len + 1);
+    M_Copy(result.buffer, string.buffer, result.len);
+    return result;
+}
+
 Function S16
 S16Clone(M_Arena *arena, S16 string)
 {
@@ -516,13 +526,37 @@ S16Clone(M_Arena *arena, S16 string)
     return result;
 }
 
-Function S8
-S8Truncate(M_Arena *arena, S8 string, size_t len)
+Function S16
+S16CloneFL(M_FreeList *free_list, S16 string)
 {
-    S8 result;
-    result.len = len;
-    result.buffer = M_ArenaPushAligned(arena, len + 1, 1);
-    M_Copy(result.buffer, string.buffer, result.len);
+    S16 result;
+    size_t size = string.len*sizeof(string.buffer[0]);
+    result.len = string.len;
+    result.buffer = M_FreeListAlloc(free_list, size + sizeof(wchar_t));
+    M_Copy(result.buffer, string.buffer, size);
+    return result;
+}
+
+Function S8
+S8PrefixGet(S8 string, size_t len)
+{
+    S8 result =
+    {
+        .len = Min1U(len, string.len),
+        .buffer = string.buffer,
+    };
+    return result;
+}
+
+Function S8
+S8SuffixGet(S8 string, size_t len)
+{
+    S8 result =
+    {
+        .len = Min1U(len, string.len),
+        .buffer = string.buffer,
+    };
+    result.buffer += string.len - result.len;
     return result;
 }
 
@@ -644,41 +678,62 @@ S8Substring(S8 h, S8 n, MatchFlags flags)
     return result;
 }
 
-Function S8
-S8Advance(S8 string, size_t n)
+Function Bool
+S8HasSubstring(S8 h, S8 n, MatchFlags flags)
 {
-    size_t to_advance = Min1U(n, string.len);
-    S8 result =
-    {
-        .buffer = string.buffer + n,
-        .len = string.len - n,
-    };
+    Bool result = (S8Substring(h, n, flags).len > 0);
     return result;
 }
 
 Function S8
-S8Strip(M_Arena *arena, S8 a, int b)
+S8Advance(S8 *string, size_t n)
 {
-    S8 result = S8Clone(arena, a);
-    
-    UTFConsume consume;
-    for(size_t character_index = 0;
-        character_index < result.len;
-        character_index += consume.advance)
+    size_t to_advance = Min1U(n, string->len);
+    S8 result =
     {
-        consume = CodepointFromUTF8(result, character_index);
-        
-        if(b == consume.codepoint)
-        {
-            M_Copy(&result.buffer[character_index],
-                   &result.buffer[character_index + consume.advance],
-                   result.len - (character_index - consume.advance));
-            
-            character_index -= consume.advance;
-            result.len -= consume.advance;
-        }
+        .buffer = string->buffer,
+        .len = n,
+    };
+    string->buffer += n;
+    string->len = (string->len - n > string->len) ? 0 : string->len - n;
+    return result;
+}
+
+Function Bool
+S8Consume(S8 *string, S8 consume)
+{
+    Bool result = False;
+    if(S8Match(*string, consume, MatchFlags_RightSideSloppy))
+    {
+        S8Advance(string, consume.len);
+        result = True;
     }
-    result.buffer[result.len] = '\0';
+    return result;
+}
+
+Function S8
+S8Replace(M_Arena *arena, S8 string, S8 a, S8 b, MatchFlags flags)
+{
+    S8 result = {0};
+    
+    S8Split split;
+    
+    split = S8SplitMake(string, a, flags);
+    while(S8SplitNext(&split))
+    {
+        result.len += split.current.len + b.len;
+    }
+    result.buffer = M_ArenaPush(arena, result.len + 1);
+    
+    size_t i = 0;
+    split = S8SplitMake(string, a, flags);
+    while(S8SplitNext(&split))
+    {
+        M_Copy(&result.buffer[i], split.current.buffer, split.current.len);
+        i += split.current.len;
+        M_Copy(&result.buffer[i], b.buffer, b.len);
+        i += b.len;
+    }
     
     return result;
 };
@@ -756,7 +811,7 @@ S8LFFromCRLF(M_Arena *arena, S8 string)
         {
             char *c = M_ArenaPushAligned(arena, 1, 1);
             *c = '\n';
-            if(NULL == result.buffer)
+            if(0 == result.buffer)
             {
                 result.buffer = c;
             }
@@ -767,7 +822,7 @@ S8LFFromCRLF(M_Arena *arena, S8 string)
         {
             char *c = M_ArenaPushAligned(arena, consume.advance, 1);
             M_Copy(c, &string.buffer[i], consume.advance);
-            if(NULL == result.buffer)
+            if(0 == result.buffer)
             {
                 result.buffer = c;
             }
@@ -788,7 +843,7 @@ FilenameHasTrailingSlash(S8 filename)
 Function S8
 ExtensionFromFilename(S8 filename)
 {
-    char *last_dot = NULL;
+    char *last_dot = 0;
     
     UTFConsume consume = CodepointFromUTF8(filename, 0);
     for(size_t character_index = 0;
@@ -808,7 +863,7 @@ ExtensionFromFilename(S8 filename)
         .buffer = last_dot,
         .len = filename.len - (last_dot - filename.buffer),
     };
-    if(NULL == last_dot)
+    if(0 == last_dot)
     {
         result.buffer = &filename.buffer[filename.len];
         result.len = 0;
@@ -842,7 +897,7 @@ FilenamePush(M_Arena *arena, S8 filename, S8 string)
 Function S8
 FilenamePop(S8 filename)
 {
-    char *last_slash = NULL;
+    char *last_slash = 0;
     
     UTFConsume consume = CodepointFromUTF8(filename, 0);
     for(size_t character_index = 0;
@@ -858,7 +913,7 @@ FilenamePop(S8 filename)
     }
     
     S8 result = {0};
-    if(NULL != last_slash)
+    if(0 != last_slash)
     {
         result.buffer = filename.buffer;
         result.len = last_slash - filename.buffer - 1;
@@ -870,7 +925,7 @@ FilenamePop(S8 filename)
 Function S8
 FilenameLast(S8 filename)
 {
-    char *last_slash = NULL;
+    char *last_slash = 0;
     
     UTFConsume consume = CodepointFromUTF8(filename, 0);
     for(size_t character_index = 0;
@@ -886,10 +941,27 @@ FilenameLast(S8 filename)
     }
     
     S8 result = filename;
-    if(NULL != last_slash)
+    if(0 != last_slash)
     {
         result.buffer = last_slash;
         result.len = &filename.buffer[filename.len] - last_slash;
+    }
+    
+    return result;
+}
+
+Function Bool
+FilenameIsChild(S8 parent, S8 filename)
+{
+    Bool result = False;
+    
+    while(!result && parent.len > 0)
+    {
+        if(S8Match(parent, filename, 0))
+        {
+            result  = True;
+        }
+        parent = FilenamePop(parent);
     }
     
     return result;
@@ -914,15 +986,109 @@ S8IsWordBoundary(S8 string, size_t index)
     return result;
 }
 
+Function double
+S8Parse1F(S8 string)
+{
+    // TODO(tbt): something less dumb
+    
+    double result = 0.0f;
+    double sign = 1.0f;
+    
+    if(0 == string.len)
+    {
+        result = NaN;
+    }
+    else
+    {
+        if('-' == string.buffer[0])
+        {
+            sign = -1.0f;
+            S8Advance(&string, 1);
+        }
+        
+        Bool past_radix = False;
+        float radix = 1.0f;
+        
+        while(string.len > 0)
+        {
+            if(CharIsNumber(string.buffer[0]))
+            {
+                if(past_radix)
+                {
+                    radix *= 10.0f;
+                }
+                result *= 10.0f;
+                result += string.buffer[0] - '0';
+            }
+            else if(!past_radix && '.' == string.buffer[0])
+            {
+                past_radix = True;
+            }
+            else
+            {
+                result = NaN;
+                break;
+            }
+            
+            S8Advance(&string, 1);
+        }
+        
+        result = sign*(result / radix);
+    }
+    
+    return result;
+}
+
+Function S8Split
+S8SplitMake(S8 string, S8 delimiter, MatchFlags flags)
+{
+    S8Split result =
+    {
+        .delimiter = delimiter,
+        .flags = flags,
+        .string = string,
+    };
+    return result;
+}
+
+Function Bool
+S8SplitNext(S8Split *state)
+{
+    Bool result = False;
+    
+    if(state->string.len > 0)
+    {
+        S8 substring = S8Substring(state->string, state->delimiter, state->flags);
+        if(0 == substring.buffer)
+        {
+            state->current = state->string;
+            state->string = (S8){0};
+        }
+        else
+        {
+            S8 next =
+            {
+                .buffer = state->string.buffer,
+                .len = substring.buffer - state->string.buffer,
+            };
+            state->current = next;
+            S8Advance(&state->string, next.len + state->delimiter.len);
+        }
+        result = True;
+    }
+    
+    return result;
+}
+
 //~NOTE(tbt): string lists
 
 Function void
 S8ListPushExplicit(S8List *list, S8Node *string)
 {
-    if(NULL == list->first)
+    if(0 == list->first)
     {
-        Assert(NULL == list->last);
-        string->next = NULL;
+        Assert(0 == list->last);
+        string->next = 0;
         list->first = string;
         list->last = string;
     }
@@ -931,14 +1097,15 @@ S8ListPushExplicit(S8List *list, S8Node *string)
         string->next = list->first;
         list->first = string;
     }
+    list->count += 1;
 }
 
 Function void
 S8ListAppendExplicit(S8List *list, S8Node *string)
 {
-    if(NULL == list->last)
+    if(0 == list->last)
     {
-        Assert(NULL == list->first);
+        Assert(0 == list->first);
         list->first = string;
         list->last = string;
     }
@@ -947,7 +1114,8 @@ S8ListAppendExplicit(S8List *list, S8Node *string)
         list->last->next = string;
         list->last = string;
     }
-    string->next = NULL;
+    string->next = 0;
+    list->count += 1;
 }
 
 Function S8Node *
@@ -966,6 +1134,15 @@ S8ListAppend(M_Arena *arena, S8List *list, S8 string)
     node->string = S8Clone(arena, string);
     S8ListAppendExplicit(list, node);
     return node;
+}
+
+Function void
+S8ListConcatenate(M_Arena *arena, S8List *a, S8List b)
+{
+    for(S8ListForEach(b, s))
+    {
+        S8ListAppend(arena, a, s->string);
+    }
 }
 
 Function S8List
@@ -987,7 +1164,7 @@ S8ListJoin(M_Arena *arena, S8List list)
     {
         char *buffer = M_ArenaPushAligned(arena, node->string.len, 1);
         M_Copy(buffer, node->string.buffer, node->string.len);
-        if(NULL == result.buffer)
+        if(0 == result.buffer)
         {
             result.buffer = buffer;
         }
@@ -1000,24 +1177,29 @@ S8ListJoin(M_Arena *arena, S8List list)
 }
 
 Function S8
-S8ListJoinDelimited(M_Arena *arena, S8List list, S8 delimiter)
+S8ListJoinFormatted(M_Arena *arena, S8List list, S8ListJoinFormat join)
 {
     S8 result = {0};
+    
+    size_t prefix_and_suffix_len = join.prefix.len + join.suffix.len;
+    
     for(S8ListForEach(list, node))
     {
-        char *buffer = M_ArenaPushAligned(arena, node->string.len, 1);
-        M_Copy(buffer, node->string.buffer, node->string.len);
-        if(NULL != node->next)
+        char *buffer = M_ArenaPushAligned(arena, node->string.len + prefix_and_suffix_len, 1);
+        result.len += node->string.len + prefix_and_suffix_len;
+        M_Copy(buffer, join.prefix.buffer, join.prefix.len);
+        M_Copy(buffer + join.prefix.len, node->string.buffer, node->string.len);
+        M_Copy(buffer + join.prefix.len + node->string.len, join.suffix.buffer, join.suffix.len);
+        if(0 != node->next)
         {
-            char *delimiter_copy = M_ArenaPushAligned(arena, delimiter.len, 1);
-            M_Copy(delimiter_copy, delimiter.buffer, delimiter.len);
-            result.len += delimiter.len;
+            char *delimiter_copy = M_ArenaPushAligned(arena, join.delimiter.len, 1);
+            result.len += join.delimiter.len;
+            M_Copy(delimiter_copy, join.delimiter.buffer, join.delimiter.len);
         }
-        if(NULL == result.buffer)
+        if(0 == result.buffer)
         {
             result.buffer = buffer;
         }
-        result.len += node->string.len;
     }
     // NOTE(tbt): null terminate to make easy to use with system APIs
     M_ArenaPushAligned(arena, sizeof(*result.buffer), 1);
@@ -1033,12 +1215,12 @@ S8ListS8FromIndex(S8List list,
     
     S8Node *node = list.first;
     for(size_t i = 0;
-        i < index && NULL != node;
+        i < index && 0 != node;
         node = node->next)
     {
         i += 1;
     }
-    if(NULL != node)
+    if(0 != node)
     {
         result = node->string;
     }
@@ -1080,26 +1262,33 @@ S8ListHasS8(S8List list,
     return result;
 }
 
-Function size_t
-S8ListCount(S8List list)
-{
-    size_t result = 0;
-    for(S8ListForEach(list, s))
-    {
-        result += 1;
-    }
-    return result;
-}
-
-Function
-S8ListRecalculateLastPtr_(S8List *list)
+Function void
+S8ListRecalculate(S8List *list)
 {
     // TODO(tbt): this is kind of dumb
-    list->last = NULL;
+    list->count = 0;
+    list->last = 0;
     for(S8ListForEach(*list, s))
     {
         list->last = s;
+        list->count += 1;
     }
+}
+
+Function void
+S8ListRemoveExplicit(S8List *list, S8Node *string)
+{
+    for(S8Node **s = &list->first;
+        0 != *s;
+        s = &(*s)->next)
+    {
+        if(*s == string)
+        {
+            *s = string->next;
+            break;
+        }
+    }
+    S8ListRecalculate(list);
 }
 
 Function S8Node *
@@ -1107,19 +1296,20 @@ S8ListRemoveFirstOccurenceOf(S8List *list,
                              S8 string,
                              MatchFlags flags)
 {
-    S8Node *result = NULL;
+    S8Node *result = 0;
     for(S8Node **s = &list->first;
-        NULL == result && NULL != (*s);
+        0 == result && 0 != (*s);
         s = &(*s)->next)
     {
         if(S8Match(string, (*s)->string, flags))
         {
             result = (*s);
-            (*s) = (*s)->next;
-            result->next = NULL;
+            *s = (*s)->next;
+            list->count -= 1;
+            result->next = 0;
         }
     }
-    S8ListRecalculateLastPtr_(list);
+    S8ListRecalculate(list);
     return result;
 }
 
@@ -1129,20 +1319,124 @@ S8ListRemoveAllOccurencesOf(S8List *list,
                             MatchFlags flags)
 {
     for(S8Node **s = &list->first;
-        NULL != (*s);
+        0 != *s;
         s = &(*s)->next)
     {
         if(S8Match(string, (*s)->string, flags))
         {
-            (*s) = (*s)->next;
-            if(NULL == (*s))
+            *s = (*s)->next;
+            list->count -= 1;
+            if(0 == (*s))
             {
                 break;
             }
         }
     }
-    S8ListRecalculateLastPtr_(list);
+    S8ListRecalculate(list);
 }
+
+Function S8List
+S8ListFromS8Split(M_Arena *arena, S8 string, S8 delimiter, MatchFlags flags)
+{
+    S8List result = {0};
+    S8Split split = S8SplitMake(string, delimiter, flags);
+    while(S8SplitNext(&split))
+    {
+        S8ListAppend(arena, &result, split.current);
+    }
+    return result;
+}
+
+//~NOTE(tbt): compression
+
+#if Build_ZLib
+
+Function S8
+S8Deflate(M_Arena *arena, S8 string)
+{
+    S8 result = {0};
+    
+    if(string.len > 0)
+    {
+        unsigned char out[Kilobytes(256)];
+        
+        z_stream stream = {0};
+        if(Z_OK == deflateInit(&stream, Z_DEFAULT_COMPRESSION))
+        {
+            stream.avail_in = string.len;
+            stream.next_in = string.buffer;
+            
+            do {
+                stream.avail_out = sizeof(out);
+                stream.next_out = out;
+                deflate(&stream, Z_FINISH);
+                
+                size_t have = sizeof(out) - stream.avail_out;
+                char *buffer = M_ArenaPushAligned(arena, have, 1);
+                if(0 == result.buffer)
+                {
+                    result.buffer = buffer;
+                }
+                M_Copy(result.buffer + result.len, out, have);
+                result.len += have;
+            } while (stream.avail_out == 0);
+            
+            deflateEnd(&stream);
+        }
+    }
+    
+    return result;
+}
+
+Function S8
+S8Inflate(M_Arena *arena, S8 string)
+{
+    S8 result = {0};
+    
+    if(string.len > 0)
+    {
+        unsigned char out[Kilobytes(256)];
+        
+        z_stream stream = {0};
+        if(Z_OK == inflateInit(&stream))
+        {
+            int rc;
+            do {
+                stream.avail_in = string.len;
+                stream.next_in = string.buffer;
+                
+                do {
+                    stream.avail_out = sizeof(out);
+                    stream.next_out = out;
+                    rc = inflate(&stream, Z_NO_FLUSH);
+                    switch(rc)
+                    {
+                        case Z_NEED_DICT:
+                        case Z_DATA_ERROR:
+                        case Z_MEM_ERROR:
+                        goto end;
+                    }
+                    
+                    size_t have = sizeof(out) - stream.avail_out;
+                    char *buffer = M_ArenaPushAligned(arena, have, 1);
+                    if(0 == result.buffer)
+                    {
+                        result.buffer = buffer;
+                    }
+                    M_Copy(result.buffer + result.len, out, have);
+                    result.len += have;
+                } while (stream.avail_out == 0);
+            } while (rc != Z_STREAM_END);
+            
+            end:;
+            inflateEnd(&stream);
+        }
+    }
+    
+    return result;
+}
+
+#endif
 
 //~NOTE(tbt): deserialisation
 
@@ -1150,7 +1444,7 @@ Function uint8_t
 S8DeserialiseU8(S8 *data)
 {
     uint8_t result = S8ReadType(uint8_t, *data);
-    *data = S8Advance(*data, sizeof(uint8_t));
+    S8Advance(data, sizeof(uint8_t));
     return result;
 }
 
@@ -1158,7 +1452,7 @@ Function uint16_t
 S8DeserialiseU16(S8 *data)
 {
     uint16_t result = S8ReadType(uint16_t, *data);
-    *data = S8Advance(*data, sizeof(uint16_t));
+    S8Advance(data, sizeof(uint16_t));
     return result;
 }
 
@@ -1166,7 +1460,7 @@ Function uint32_t
 S8DeserialiseU32(S8 *data)
 {
     uint32_t result = S8ReadType(uint32_t, *data);
-    *data = S8Advance(*data, sizeof(uint32_t));
+    S8Advance(data, sizeof(uint32_t));
     return result;
 }
 
@@ -1174,7 +1468,7 @@ Function uint64_t
 S8DeserialiseU64(S8 *data)
 {
     uint64_t result = S8ReadType(uint64_t, *data);
-    *data = S8Advance(*data, sizeof(uint64_t));
+    S8Advance(data, sizeof(uint64_t));
     return result;
 }
 
@@ -1182,7 +1476,7 @@ Function int8_t
 S8DeserialiseI8(S8 *data)
 {
     int8_t result = S8ReadType(int8_t, *data);
-    *data = S8Advance(*data, sizeof(int8_t));
+    S8Advance(data, sizeof(int8_t));
     return result;
 }
 
@@ -1190,7 +1484,7 @@ Function int16_t
 S8DeserialiseI16(S8 *data)
 {
     int16_t result = S8ReadType(int16_t, *data);
-    *data = S8Advance(*data, sizeof(int16_t));
+    S8Advance(data, sizeof(int16_t));
     return result;
 }
 
@@ -1198,7 +1492,7 @@ Function int32_t
 S8DeserialiseI32(S8 *data)
 {
     int32_t result = S8ReadType(int32_t, *data);
-    *data = S8Advance(*data, sizeof(int32_t));
+    S8Advance(data, sizeof(int32_t));
     return result;
 }
 
@@ -1206,7 +1500,7 @@ Function int64_t
 S8DeserialiseI64(S8 *data)
 {
     int64_t result = S8ReadType(int64_t, *data);
-    *data = S8Advance(*data, sizeof(int64_t));
+    S8Advance(data, sizeof(int64_t));
     return result;
 }
 
@@ -1214,7 +1508,7 @@ Function float
 S8Deserialise1F(S8 *data)
 {
     float result = S8ReadType(float, *data);
-    *data = S8Advance(*data, sizeof(float));
+    S8Advance(data, sizeof(float));
     return result;
 }
 
@@ -1253,5 +1547,5 @@ S8SerialiseBytes(S8 *data, void *src, size_t bytes)
 {
     size_t to_copy = Min1U(bytes, data->len);
     M_Copy(data->buffer, src, to_copy);
-    *data = S8Advance(*data, to_copy);
+    S8Advance(data, to_copy);
 }

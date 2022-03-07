@@ -27,3 +27,10 @@ TC_ScratchGet(M_Arena *non_conflict[], int non_conflict_count)
     result = M_ScratchGet(pool, non_conflict, non_conflict_count);
     return result;
 }
+
+Function M_Arena *
+TC_ArenaFromThread(void)
+{
+    M_Arena *result = &TC_Get()->permanent_arena;
+    return result;
+}

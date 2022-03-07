@@ -52,7 +52,7 @@ Function void     EV_QueueDestroy (EV_Queue *queue);
 
 Function EV_Data *EV_QueueFirstGet (EV_Queue *queue);
 Function EV_Data *EV_QueueNextGet  (EV_Queue *queue, EV_Data *current);
-#define EV_QueueForEach(Q, V) EV_Data *(V) = EV_QueueFirstGet(Q); NULL != (V); (V) = EV_QueueNextGet((Q), (V))
+#define EV_QueueForEach(Q, V) EV_Data *(V) = EV_QueueFirstGet(Q); 0 != (V); (V) = EV_QueueNextGet((Q), (V))
 
 //~NOTE(tbt): event loop wrappers
 

@@ -4,22 +4,32 @@
 Function W32_Sprite *
 W32_SpriteAllocate(void)
 {
-    W32_Sprite *result = w32_r_data.sprite_free_list;
-    w32_r_data.sprite_free_list = w32_r_data.sprite_free_list->free_list_next;
+    SemaphoreWait(w32_sprite_allocator.lock);
+    
+    if(0 == w32_sprite_allocator.arena.base)
+    {
+        w32_sprite_allocator.arena = M_ArenaMake(m_default_hooks);
+        w32_sprite_allocator.free_list = &w32_sprite_nil;
+    }
+    W32_Sprite *result = w32_sprite_allocator.free_list;
+    w32_sprite_allocator.free_list = w32_sprite_allocator.free_list->free_list_next;
     if(R_SpriteIsNil((R_Sprite *)result))
     {
-        result = M_ArenaPush(&w32_r_data.sprite_arena, sizeof(*result));
+        result = M_ArenaPush(&w32_sprite_allocator.arena, sizeof(*result));
     }
     result->free_list_next = &w32_sprite_nil;
+    
+    SemaphoreSignal(w32_sprite_allocator.lock);
     return result;
 }
 
 Function void
 W32_SpriteFree(W32_Sprite *sprite)
 {
-    M_Set(sprite, sizeof(*sprite), 0);
-    sprite->free_list_next = w32_r_data.sprite_free_list;
-    w32_r_data.sprite_free_list = sprite;
+    SemaphoreWait(w32_sprite_allocator.lock);
+    sprite->free_list_next = w32_sprite_allocator.free_list;
+    w32_sprite_allocator.free_list = sprite;
+    SemaphoreSignal(w32_sprite_allocator.lock);
 }
 
 Function R_Sprite *
@@ -58,11 +68,11 @@ R_SpriteMake(Pixel *data, V2I dimensions)
                                  &desc, &subresource_data,
                                  &texture);
     ID3D11Device_CreateShaderResourceView(w32_g_app.device,
-                                          (ID3D11Resource*)texture, NULL,
+                                          (ID3D11Resource*)texture, 0,
                                           &result->texture_view);
     ID3D11Texture2D_Release(texture);
     
-    Assert(NULL != result->texture_view);
+    Assert(0 != result->texture_view);
     
     return (R_Sprite *)result;
 }
@@ -70,24 +80,27 @@ R_SpriteMake(Pixel *data, V2I dimensions)
 Function void
 R_SpriteDestroy(R_Sprite *sprite)
 {
-    W32_Sprite *s = (W32_Sprite *)sprite;
-    ID3D11ShaderResourceView_Release(s->texture_view);
-    if(NULL != s->texture)
+    if(!R_SpriteIsNil(sprite))
     {
-        ID3D11Texture_Release(s->texture);
+        W32_Sprite *s = (W32_Sprite *)sprite;
+        ID3D11ShaderResourceView_Release(s->texture_view);
+        if(0 != s->texture)
+        {
+            ID3D11Texture2D_Release(s->texture);
+        }
+        M_Set(s, 0, sizeof(*s));
+        W32_SpriteFree(s);
     }
-    M_Set(s, 0, sizeof(*s));
-    W32_SpriteFree(s);
 }
 
 Function R_Font *
-R_FontMake(S8 filename, int size)
+R_FontMake(S8 font_data, int size)
 {
     //-NOTE(tbt): setup memory
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     M_Arena arena = M_ArenaMake(m_default_hooks);
 #if Build_NoCRT
-    if(NULL == r_arena_for_stb_truetype.base)
+    if(0 == r_arena_for_stb_truetype.base)
     {
         r_arena_for_stb_truetype = M_ArenaMake(m_default_hooks);
     }
@@ -97,10 +110,7 @@ R_FontMake(S8 filename, int size)
     R_Font *result = M_ArenaPush(&arena, sizeof(*result));
     result->arena = arena;
     result->glyph_cache_atlas = (R_Sprite *)W32_SpriteAllocate();
-    
-    //-NOTE(tbt): read TTF data
-    result->font_file = F_ReadEntire(&arena, filename);
-    Assert(NULL != result->font_file.buffer);
+    result->font_file = S8Clone(&arena, font_data);
     
     //-NOTE(tbt): get font info
     int ascent, descent, line_gap;
@@ -118,7 +128,7 @@ R_FontMake(S8 filename, int size)
     stbtt_PackBegin(&spc, pixels,
                     R_Font_AsciiAtlasDimensions,
                     R_Font_AsciiAtlasDimensions,
-                    0, 2, NULL);
+                    0, 2, 0);
     stbtt_PackSetOversampling(&spc, 2, 2);
     Bool succesfully_packed_ascii_atlas = stbtt_PackFontRange(&spc, result->font_file.buffer, 0, size,
                                                               R_Font_AsciiAtlasPackRangeBegin,
@@ -152,12 +162,13 @@ R_FontMake(S8 filename, int size)
         .BindFlags = D3D11_BIND_SHADER_RESOURCE,
         .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
     };
+    
     ID3D11Device_CreateTexture2D(w32_g_app.device,
-                                 &glyph_cache_texture_desc, NULL,
+                                 &glyph_cache_texture_desc, 0,
                                  &glyph_cache_sprite->texture);
     ID3D11Device_CreateShaderResourceView(w32_g_app.device,
                                           (ID3D11Resource *)glyph_cache_sprite->texture,
-                                          NULL,
+                                          0,
                                           &glyph_cache_sprite->texture_view);
     glyph_cache_sprite->parent.dimensions = U2I(R_Font_GlyphCacheDimensionsInPixels);
     for(size_t cache_cell_index = 0;
@@ -169,12 +180,6 @@ R_FontMake(S8 filename, int size)
     
     M_TempEnd(&scratch);
     return result;
-}
-
-Function void
-R_FontDestroy(R_Font *font)
-{
-    // TODO(tbt): 
 }
 
 //~NOTE(tbt): batches
@@ -296,7 +301,7 @@ W32_RenderBatchFlush(W32_RenderBatch *batch)
         
         //-NOTE(tbt): vertex shader
         ID3D11DeviceContext_VSSetConstantBuffers(w32_g_app.device_ctx, 0, 1, &w32_r_data.uniform_buffer);
-        ID3D11DeviceContext_VSSetShader(w32_g_app.device_ctx, batch->shader->vertex_shader, NULL, 0);
+        ID3D11DeviceContext_VSSetShader(w32_g_app.device_ctx, batch->shader->vertex_shader, 0, 0);
         
         //-NOTE(tbt): rasteriser
         ID3D11DeviceContext_RSSetState(w32_g_app.device_ctx, w32_r_data.rasteriser_state);
@@ -312,10 +317,10 @@ W32_RenderBatchFlush(W32_RenderBatch *batch)
         //-NOTE(tbt): pixel shader
         ID3D11DeviceContext_PSSetSamplers(w32_g_app.device_ctx, 0, 1, &w32_r_data.sampler);
         ID3D11DeviceContext_PSSetShaderResources(w32_g_app.device_ctx, 0, 1, &batch->texture->texture_view);
-        ID3D11DeviceContext_PSSetShader(w32_g_app.device_ctx, batch->shader->pixel_shader, NULL, 0);
+        ID3D11DeviceContext_PSSetShader(w32_g_app.device_ctx, batch->shader->pixel_shader, 0, 0);
         
         //-NOTE(tbt): output merger
-        ID3D11DeviceContext_OMSetBlendState(w32_g_app.device_ctx, w32_r_data.blend_state, NULL, ~0U);
+        ID3D11DeviceContext_OMSetBlendState(w32_g_app.device_ctx, w32_r_data.blend_state, 0, ~0U);
         ID3D11DeviceContext_OMSetDepthStencilState(w32_g_app.device_ctx, w32_r_data.depth_stencil_state, 0);
         ID3D11DeviceContext_OMSetRenderTargets(w32_g_app.device_ctx, 1, &batch->window->render_target_view, batch->window->depth_stencil_view);
         
@@ -325,8 +330,8 @@ W32_RenderBatchFlush(W32_RenderBatch *batch)
     
     batch->vertices_count = 0;
     batch->indices_count = 0;
-    batch->texture = NULL;
-    batch->shader = NULL;
+    batch->texture = 0;
+    batch->shader = 0;
     batch->should_flush = False;
 }
 
@@ -337,10 +342,10 @@ R_CmdQueueExec(R_CmdQueue *q, W_Handle window)
 {
     W32_Window *w = window;
     
-    Persist W32_RenderBatch *batch = NULL;
-    if(NULL == batch)
+    Persist W32_RenderBatch *batch = 0;
+    if(0 == batch)
     {
-        batch = M_ArenaPush(&TC_Get()->permanent_arena, sizeof(*batch));
+        batch = M_ArenaPush(TC_ArenaFromThread(), sizeof(*batch));
     }
     batch->window = w;
     
@@ -374,9 +379,9 @@ R_CmdQueueExec(R_CmdQueue *q, W_Handle window)
             
             case(R_CmdKind_Clear):
             {
-                if(NULL != w->backbuffer_render_target_view &&
-                   NULL != w->depth_stencil_view &&
-                   NULL != w->render_target_view)
+                if(0 != w->backbuffer_render_target_view &&
+                   0 != w->depth_stencil_view &&
+                   0 != w->render_target_view)
                 {
                     W32_RenderBatchFlush(batch);
                     ID3D11DeviceContext_ClearRenderTargetView(w32_g_app.device_ctx, w->backbuffer_render_target_view, cmd->colour.elements);
@@ -386,6 +391,7 @@ R_CmdQueueExec(R_CmdQueue *q, W_Handle window)
             } break;
             
             case(R_CmdKind_DrawSprite):
+            case_R_CmdKind_DrawSprite:;
             {
                 if(!Eq(batch->mask, cmd->mask) ||
                    batch->shader != &w32_r_data.default_shader ||
@@ -560,6 +566,7 @@ R_CmdQueueExec(R_CmdQueue *q, W_Handle window)
                         {
                             break;
                         }
+                        
                         W32_RenderBatchQuadPush(batch, rect, uv, cmd->colour);
                     }
                     else
@@ -592,7 +599,7 @@ R_CmdQueueExec(R_CmdQueue *q, W_Handle window)
                                                   (cell_index / R_Font_GlyphCacheGridSize)*R_Font_GlyphCacheCellSize);
                             
                             int advance;
-                            stbtt_GetGlyphHMetrics(&cmd->font->font_info, gi, &advance, NULL);
+                            stbtt_GetGlyphHMetrics(&cmd->font->font_info, gi, &advance, 0);
                             advance += kern;
                             advance *= cmd->font->scale;
                             
@@ -699,9 +706,8 @@ R_CmdQueueExec(R_CmdQueue *q, W_Handle window)
             
             case(R_CmdKind_DrawRoundedRect):
             {
-                if(cmd->size < 2.0f ||
-                   cmd->size >= Abs1F(cmd->rect.max.x - cmd->rect.min.x) / 2.0f ||
-                   cmd->size >= Abs1F(cmd->rect.max.y - cmd->rect.min.y) / 2.0f)
+                cmd->size = Min1F(cmd->size, 0.5f*Min1F(Dimensions2F(cmd->rect).x, Dimensions2F(cmd->rect).y));
+                if(cmd->size < 2.0f)
                 {
                     goto case_R_CmdKind_DrawSprite;
                 }

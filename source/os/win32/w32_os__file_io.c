@@ -1,10 +1,23 @@
-Function uint64_t
+
+Global S16 w32_f_last_error_msg = {0};
+
+Function size_t
 W32_FileSizeGet(HANDLE file_handle)
 {
     DWORD hi_size, lo_size;
     lo_size = GetFileSize(file_handle, &hi_size);
     uint64_t result = W32_U64FromHiAndLoWords(hi_size, lo_size);
     return result;
+}
+
+#define W32_UpdateLastUpdateLastFileIOError(F)                     \
+if(!success)                                                     \
+{                                                                \
+if(0 != w32_f_last_error_msg.buffer)                            \
+{                                                               \
+LocalFree(w32_f_last_error_msg.buffer);                        \
+}                                                               \
+w32_f_last_error_msg = W32_FormatLastError(S16(F)); \
 }
 
 Function S8
@@ -25,6 +38,7 @@ F_ReadEntire(M_Arena *arena, S8 filename)
         size_t n_total_bytes_to_read = W32_FileSizeGet(file_handle);
         
         M_Temp checkpoint = M_TempBegin(arena);
+        
         result.buffer = M_ArenaPush(arena, n_total_bytes_to_read + 1);
         result.len = n_total_bytes_to_read;
         
@@ -34,8 +48,7 @@ F_ReadEntire(M_Arena *arena, S8 filename)
         Bool success = True;
         while(cursor < end && success)
         {
-            uint64_t _n_bytes_to_read = end - cursor;
-            DWORD n_bytes_to_read = Min(UINT_MAX, _n_bytes_to_read);
+            DWORD n_bytes_to_read = Min(UINT_MAX, end - cursor);
             
             DWORD n_bytes_read;
             if(ReadFile(file_handle, cursor, n_bytes_to_read, &n_bytes_read, 0))
@@ -45,18 +58,25 @@ F_ReadEntire(M_Arena *arena, S8 filename)
             else
             {
                 success = False;
+                W32_UpdateLastUpdateLastFileIOError("ReadFile");
             }
         }
         
         if(!success)
         {
-            result.buffer = NULL;
+            result.buffer = 0;
             result.len = 0;
             M_TempEnd(&checkpoint);
         }
         
         CloseHandle(file_handle);
     }
+    else
+    {
+        Bool success = False;
+        W32_UpdateLastUpdateLastFileIOError("CreateFileW");
+    }
+    
     M_TempEnd(&scratch);
     return result;
 }
@@ -77,7 +97,7 @@ F_WriteEntire(S8 filename, S8 data)
 {
     Bool success = True;
     
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
     HANDLE file_handle = CreateFileW(filename_s16.buffer,
                                      GENERIC_WRITE,
@@ -95,18 +115,25 @@ F_WriteEntire(S8 filename, S8 data)
             uint64_t _n_bytes_to_write = end - cursor;
             DWORD n_bytes_to_write = Min(UINT_MAX, _n_bytes_to_write);
             
-            DWORD n_bytes_wrote;
-            if(WriteFile(file_handle, cursor, n_bytes_to_write, &n_bytes_wrote, 0))
+            DWORD n_bytes_written;
+            if(WriteFile(file_handle, cursor, n_bytes_to_write, &n_bytes_written, 0))
             {
-                cursor += n_bytes_wrote;
+                cursor += n_bytes_written;
             }
             else
             {
                 success = False;
+                W32_UpdateLastUpdateLastFileIOError("WriteFile");
             }
         }
         CloseHandle(file_handle);
     }
+    else
+    {
+        success = False;
+        W32_UpdateLastUpdateLastFileIOError("CreateFileW");
+    }
+    
     M_TempEnd(&scratch);
     return success;
 }
@@ -142,7 +169,7 @@ F_PropertiesGet(S8 filename)
 {
     F_Properties result = {0};
     
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
     
@@ -164,10 +191,11 @@ Function Bool
 F_Delete(S8 filename)
 {
     Bool success;
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
     success = DeleteFileW(filename_s16.buffer);
     M_TempEnd(&scratch);
+    W32_UpdateLastUpdateLastFileIOError("DeleteFileW");
     return success;
 }
 
@@ -175,11 +203,12 @@ Function Bool
 F_Move(S8 filename, S8 new_filename)
 {
     Bool success;
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
     S16 new_filename_s16 = S16FromS8(scratch.arena, new_filename);
     success = MoveFileExW(filename_s16.buffer, new_filename_s16.buffer, MOVEFILE_COPY_ALLOWED);
     M_TempEnd(&scratch);
+    W32_UpdateLastUpdateLastFileIOError("MoveFileExW");
     return success;
 }
 
@@ -187,10 +216,11 @@ Function Bool
 F_DirectoryMake(S8 filename)
 {
     Bool success;
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
     success = CreateDirectoryW(filename_s16.buffer, 0);
     M_TempEnd(&scratch);
+    W32_UpdateLastUpdateLastFileIOError("CreateDirectoryW");
     return success;
 }
 
@@ -198,23 +228,20 @@ Function Bool
 F_DirectoryDelete(S8 filename)
 {
     Bool success;
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
     success = RemoveDirectoryW(filename_s16.buffer);
     M_TempEnd(&scratch);
+    W32_UpdateLastUpdateLastFileIOError("RemoveDirectoryW");
     return success;
 }
 
-typedef union
+typedef struct
 {
-    F_Iterator iter;
-    struct
-    {
-        F_Iterator _;
-        HANDLE handle;
-        WIN32_FIND_DATAW find_data;
-        Bool is_done;
-    };
+    F_Iterator _;
+    HANDLE handle;
+    WIN32_FIND_DATAW find_data;
+    Bool is_done;
 } W32_FileIterator;
 
 Function F_Iterator *
@@ -239,7 +266,7 @@ F_IteratorNext(M_Arena *arena, F_Iterator *iter)
     M_Temp scratch = TC_ScratchGet(&arena, 1);
     
     W32_FileIterator *_iter = (W32_FileIterator *)iter;
-    if(_iter->handle != NULL &&
+    if(_iter->handle != 0 &&
        _iter->handle != INVALID_HANDLE_VALUE)
     {
         while(!_iter->is_done)
@@ -285,11 +312,11 @@ Function void
 F_IteratorDestroy(F_Iterator *iter)
 {
     W32_FileIterator *_iter = (W32_FileIterator *)iter;
-    if(_iter->handle != NULL &&
+    if(_iter->handle != 0 &&
        _iter->handle != INVALID_HANDLE_VALUE)
     {
         FindClose(_iter->handle);
-        _iter->handle = NULL;
+        _iter->handle = 0;
     }
 }
 
@@ -318,44 +345,38 @@ F_StdPathGet(M_Arena *arena, F_StdPath path)
         case(F_StdPath_ExecutableFile):
         case(F_StdPath_ExecutableDir):
         {
-            if(NULL == TC_Get()->exe_path.buffer)
+            if(0 == TC_Get()->exe_path.buffer)
             {
+                // NOTE(tbt): will fail if the length of the path to the exe > cap * grow_factor ^ grow_max
+                
                 size_t cap = 2048;
+                int grow_max = 4;
+                int grow_factor = 4;
+                
+                M_Temp before = M_TempBegin(scratch.arena);
                 for(size_t r = 0; r < 4; r += 1, cap *= 4)
                 {
                     wchar_t *buffer = M_ArenaPush(scratch.arena, cap * sizeof(*buffer));
-                    DWORD size = GetModuleFileNameW(NULL, buffer, cap);
+                    DWORD size = GetModuleFileNameW(0, buffer, cap);
                     if(size == cap && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
                     {
-                        M_TempEnd(&scratch);
+                        M_TempEnd(&before);
                     }
                     else
                     {
                         TC_Get()->exe_path = S8FromS16(&TC_Get()->permanent_arena, CStringAsS16(buffer));
                     }
                 }
-                
-                // NOTE(tbt): will fail if the length of the path to the exe > cap * 4 ^ 4
             }
             
-            if(F_StdPath_ExecutableFile == path)
+            if(0 != TC_Get()->exe_path.buffer)
             {
-                result = S8Clone(arena, TC_Get()->exe_path);
-            }
-            else
-            {
-                S8 exe_path = TC_Get()->exe_path;
-                char *last_slash = exe_path.buffer;
-                for(size_t char_index = 0;
-                    char_index < exe_path.len;
-                    char_index += 1)
+                result = TC_Get()->exe_path;
+                if(F_StdPath_ExecutableDir == path)
                 {
-                    if(exe_path.buffer[char_index] == '\\')
-                    {
-                        last_slash = &exe_path.buffer[char_index];
-                    }
+                    result = FilenamePop(result);
                 }
-                result = S8Truncate(arena, exe_path, last_slash - exe_path.buffer);
+                result = S8Clone(arena, result);
             }
         } break;
         
@@ -363,7 +384,7 @@ F_StdPathGet(M_Arena *arena, F_StdPath path)
         {
             HANDLE token_handle = GetCurrentProcessToken();
             DWORD size = 0;
-            GetUserProfileDirectoryW(token_handle, NULL, &size);
+            GetUserProfileDirectoryW(token_handle, 0, &size);
             wchar_t *buffer = M_ArenaPush(scratch.arena, size * sizeof(*buffer));
             if(GetUserProfileDirectoryW(token_handle, buffer, &size))
             {
@@ -374,14 +395,14 @@ F_StdPathGet(M_Arena *arena, F_StdPath path)
         case(F_StdPath_Config):
         {
             wchar_t *buffer;
-            SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, NULL, &buffer);
+            SHGetKnownFolderPath(&FOLDERID_LocalAppData, 0, 0, &buffer);
             result = S8FromS16(arena, CStringAsS16(buffer));
             CoTaskMemFree(buffer);
         } break;
         
         case(F_StdPath_Temp):
         {
-            DWORD size = GetTempPathW(0, NULL);
+            DWORD size = GetTempPathW(0, 0);
             wchar_t *buffer = M_ArenaPush(scratch.arena, size * sizeof(*buffer));
             GetTempPathW(size, buffer);
             result = S8FromS16(arena, CStringAsS16(buffer));
@@ -396,17 +417,17 @@ F_StdPathGet(M_Arena *arena, F_StdPath path)
 Function void
 F_Exec(S8 filename, F_ExecVerb verb)
 {
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     
     const wchar_t *verb_table[F_ExecVerb_MAX] =
     {
-        [F_ExecVerb_Default] = NULL,
+        [F_ExecVerb_Default] = 0,
         [F_ExecVerb_Open] = L"open",
         [F_ExecVerb_Edit] = L"edit",
         [F_ExecVerb_Print] = L"print",
     };
     S16 filename_s16 = S16FromS8(scratch.arena, filename);
-    ShellExecuteW(NULL, verb_table[verb], filename_s16.buffer, NULL, NULL, SW_NORMAL);
+    ShellExecuteW(0, verb_table[verb], filename_s16.buffer, 0, 0, SW_NORMAL);
     
     M_TempEnd(&scratch);
 }
@@ -414,7 +435,7 @@ F_Exec(S8 filename, F_ExecVerb verb)
 Function void
 CwdSet(S8 cwd)
 {
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     S16 cwd_s16 = S16FromS8(scratch.arena, cwd);
     SetCurrentDirectoryW(cwd_s16.buffer);
     M_TempEnd(&scratch);
@@ -434,9 +455,9 @@ AbsolutePathFromRelativePath(M_Arena *arena, S8 path)
     {
         M_Temp scratch = TC_ScratchGet(&arena, 1);
         S16 rel_s16 = S16FromS8(scratch.arena, path);
-        size_t buf_size = GetFullPathNameW(rel_s16.buffer, 0, NULL, NULL)*sizeof(wchar_t);
+        size_t buf_size = GetFullPathNameW(rel_s16.buffer, 0, 0, 0)*sizeof(wchar_t);
         wchar_t *abs_s16 = M_ArenaPush(scratch.arena, buf_size);
-        GetFullPathNameW(rel_s16.buffer, buf_size, abs_s16, NULL);
+        GetFullPathNameW(rel_s16.buffer, buf_size, abs_s16, 0);
         result = S8FromS16(arena, CStringAsS16(abs_s16));
         M_TempEnd(&scratch);
     }
@@ -447,9 +468,9 @@ AbsolutePathFromRelativePath(M_Arena *arena, S8 path)
 Function F_ChangeHandle
 F_ChangeHandleMake(S8 filename, Bool recursive)
 {
-    void *result = NULL;
+    void *result = 0;
     
-    M_Temp scratch = TC_ScratchGet(NULL, 0);
+    M_Temp scratch = TC_ScratchGet(0, 0);
     
     S16 filename_s16 = S16FromS8(scratch.arena, AbsolutePathFromRelativePath(scratch.arena, filename));
     HANDLE file_watch_handle = FindFirstChangeNotificationW(filename_s16.buffer,
@@ -463,16 +484,16 @@ F_ChangeHandleMake(S8 filename, Bool recursive)
 }
 
 Function Bool
-F_ChangeHandleWait(F_ChangeHandle handle, size_t timeout)
+F_ChangeHandleWait(F_ChangeHandle handle, F_ChangeHandleTimeout milliseconds)
 {
     Bool result = False;
-    if(NULL != handle)
+    if(0 != handle)
     {
-        if(F_ChangeHandleWait_Infinite == timeout)
+        if(F_ChangeHandleTimeout_Infinite == milliseconds)
         {
-            timeout = INFINITE;
+            milliseconds = INFINITE;
         }
-        result = (WAIT_OBJECT_0 == WaitForSingleObject(handle, timeout));
+        result = (WAIT_OBJECT_0 == WaitForSingleObject(handle, milliseconds));
         if(result)
         {
             FindNextChangeNotification(handle);
@@ -484,8 +505,19 @@ F_ChangeHandleWait(F_ChangeHandle handle, size_t timeout)
 Function void
 F_ChangeHandleDestroy(F_ChangeHandle handle)
 {
-    if(NULL != handle)
+    if(0 != handle)
     {
         FindCloseChangeNotification(handle);
     }
+}
+
+Function S8
+F_LastErrorStringGet (M_Arena *arena)
+{
+    S8 result = {0};
+    if(0 != w32_f_last_error_msg.buffer)
+    {
+        result = S8FromS16(arena, w32_f_last_error_msg);
+    }
+    return result;
 }

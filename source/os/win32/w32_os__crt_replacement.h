@@ -1050,26 +1050,49 @@ __declspec(naked) void _aullshr()
 #endif
 
 #pragma function(memset)
-void *memset(void *dest, int c, size_t count)
+void *memset(void *dest, int c, size_t n)
 {
-    char *bytes = (char *)dest;
-    while (count--)
-    {
-        *bytes++ = (char)c;
-    }
+    unsigned char *s = dest;
+    size_t k;
+    
+    if (!n) return dest;
+    s[0] = c;
+    s[n-1] = c;
+    if (n <= 2) return dest;
+    s[1] = c;
+    s[2] = c;
+    s[n-2] = c;
+    s[n-3] = c;
+    if (n <= 6) return dest;
+    s[3] = c;
+    s[n-4] = c;
+    if (n <= 8) return dest;
+    
+    k = -(uintptr_t)s & 3;
+    s += k;
+    n -= k;
+    n &= -4;
+    
+    for (; n; n--, s++) *s = c;
+    
     return dest;
 }
 
 #pragma function(memcpy)
-void *memcpy(void *dest, const void *src, size_t count)
+void *memcpy(void *restrict dest, const void *restrict src, size_t n)
 {
-    char *dest8 = (char *)dest;
-    const char *src8 = (const char *)src;
-    while (count--)
-    {
-        *dest8++ = *src8++;
-    }
-    return dest;
+	unsigned char *d = dest;
+	const unsigned char *s = src;
+    for (; n; n--) *d++ = *s++;
+	return dest;
+}
+
+#pragma function(memcmp)
+int memcmp(const void *vl, const void *vr, size_t n)
+{
+	const unsigned char *l=vl, *r=vr;
+	for (; n && *l == *r; n--, l++, r++);
+	return n ? *l-*r : 0;
 }
 
 //~ win32_crt_seh.cpp

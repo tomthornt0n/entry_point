@@ -7,7 +7,7 @@ Function float        Noise2F (V2F a);
 
 //~NOTE(tbt): pseudo-random sequence
 
-Function void RandIntInit    (int seed, void( *interlocked_increment_callback)(volatile int *));
+Function void RandIntInit    (int seed);
 Function int  RandIntNextRaw (void);
 Function int  RandIntNext    (int min, int max);
 

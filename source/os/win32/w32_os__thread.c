@@ -5,7 +5,7 @@ Global HANDLE w32_threads_count = 0;
 
 typedef struct
 {
-    ThreadInitProc init;
+    ThreadInitHook *init;
     void *user_data;
     TC_Data tctx;
 } W32_ThreadProcArgs;
@@ -19,6 +19,7 @@ W32_ThreadProc(LPVOID param)
     ReleaseSemaphore(w32_threads_count, 1, &logical_thread_index);
     TC_Make(&args->tctx, logical_thread_index + 1);
     TC_Set(&args->tctx);
+    CoInitializeEx(0, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);
     
     args->init(args->user_data);
     
@@ -30,13 +31,13 @@ W32_ThreadProc(LPVOID param)
 }
 
 Function Thread
-ThreadCreate(ThreadInitProc init,
-             void *user_data)
+ThreadMake(ThreadInitHook *init,
+           void *user_data)
 {
     W32_ThreadProcArgs *args = LocalAlloc(0, sizeof(*args));
     args->init = init;
     args->user_data = user_data;
-    void *result = CreateThread(NULL, 0, W32_ThreadProc, args, 0, NULL);
+    void *result = CreateThread(0, 0, W32_ThreadProc, args, 0, 0);
     return result;
 }
 
@@ -46,19 +47,25 @@ ThreadJoin(Thread thread)
     WaitForSingleObject(thread, INFINITE);
 }
 
+Function void
+ThreadDestroy(Thread thread)
+{
+    TerminateThread(thread, 0);
+}
+
 //~NOTE(tbt): semaphores
 
 Function Semaphore
 SemaphoreMake(int initial)
 {
-    HANDLE sem = CreateSemaphoreW(NULL, initial, INT_MAX, NULL);
+    HANDLE sem = CreateSemaphoreW(0, initial, INT_MAX, 0);
     return sem;
 }
 
 Function void
 SemaphoreSignal(Semaphore sem)
 {
-    ReleaseSemaphore(sem, 1, NULL);
+    ReleaseSemaphore(sem, 1, 0);
 }
 
 Function void
@@ -140,10 +147,10 @@ ITL_DecrementPtr(void *volatile *a)
     
 #if Build_ArchX64
     Assert(8 == sizeof(void *));
-    result = (void *)InterlockedIncrement64((LONG64 volatile *)a);
+    result = (void *)InterlockedDecrement64((LONG64 volatile *)a);
 #elif Build_ArchX86
     Assert(4 == sizeof(void *));
-    result = (void *)InterlockedIncrement((LONG64 volatile *)a);
+    result = (void *)InterlockedDecrement((LONG64 volatile *)a);
 #else
 #   error TODO(tbt): make ITL_IncrementPtr better
 #endif
