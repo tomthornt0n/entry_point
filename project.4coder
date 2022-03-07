@@ -51,8 +51,8 @@ command_list =
         .cursor_at_end = false,
         .cmd =
         {
-            { "pushd build && lisp_experiment_debug.exe && popd", .os = "win" },
-            { "build/lisp_experiment", .os = "linux" },
+            { "pushd build && example_app_debug.exe && popd", .os = "win" },
+            { "build/example_app_debug", .os = "linux" },
         },
     },
     
@@ -65,7 +65,7 @@ command_list =
         .cmd =
         {
             { "pushd build && lisp_experiment.exe && popd", .os = "win" },
-            { "build/lisp_experiment", .os = "linux" },
+            { "build/example_app", .os = "linux" },
         },
     },
 };
