@@ -1263,7 +1263,7 @@ S8ListHasS8(S8List list,
 }
 
 Function void
-S8ListRecalculate(S8List *list)
+S8ListRefresh(S8List *list)
 {
     // TODO(tbt): this is kind of dumb
     list->count = 0;
@@ -1288,7 +1288,7 @@ S8ListRemoveExplicit(S8List *list, S8Node *string)
             break;
         }
     }
-    S8ListRecalculate(list);
+    S8ListRefresh(list);
 }
 
 Function S8Node *
@@ -1309,7 +1309,7 @@ S8ListRemoveFirstOccurenceOf(S8List *list,
             result->next = 0;
         }
     }
-    S8ListRecalculate(list);
+    S8ListRefresh(list);
     return result;
 }
 
@@ -1332,7 +1332,7 @@ S8ListRemoveAllOccurencesOf(S8List *list,
             }
         }
     }
-    S8ListRecalculate(list);
+    S8ListRefresh(list);
 }
 
 Function S8List
@@ -1344,6 +1344,7 @@ S8ListFromS8Split(M_Arena *arena, S8 string, S8 delimiter, MatchFlags flags)
     {
         S8ListAppend(arena, &result, split.current);
     }
+    S8ListRefresh(&result);
     return result;
 }
 

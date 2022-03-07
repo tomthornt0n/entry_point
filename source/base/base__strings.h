@@ -210,7 +210,7 @@ Function S8List     S8ListFromS8Split            (M_Arena *arena, S8 string, S8 
 
 #define S8ListForEach(L, V) S8Node *(V) = (L).first; 0 != (V); (V) = (V)->next
 
-Function void S8ListRecalculate (S8List *list);
+Function void S8ListReresh (S8List *list);
 
 //~NOTE(tbt): compression
 
