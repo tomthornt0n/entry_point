@@ -286,17 +286,29 @@ G_MainLoop(void)
         }
         ITL_Exchange((int volatile *)&w32_g_app.should_force_next_update, False);
         
-        W32_WindowNode *next = 0;
-        for(W32_WindowNode *w = w32_g_app.windows_first;
-            0 != w;
-            w = next)
         {
-            next = w->next;
-            w32_g_app.current_window = w;
-            if(!W_Update(w))
+            W32_WindowNode *next = 0;
+            for(W32_WindowNode *w = w32_g_app.windows_first; 0 != w; w = next)
             {
-                w->cleanup(w);
-                W32_WindowNodeRemove(w);
+                next = w->next;
+                w32_g_app.current_window = w;
+                if(!W_Update(w))
+                {
+                    w->cleanup(w);
+                    W32_WindowNodeRemove(w);
+                }
+            }
+        }
+        
+        for(W32_WindowNode *w = w32_g_app.windows_first; 0 != w; w = w->next)
+        {
+            HRESULT hr = IDXGISwapChain_Present(w->w.swap_chain, w->w.is_vsync ? 1 : 0, 0);
+            Assert_(!FAILED(hr), "Failed to present swapchain. Device lost?");
+            if(DXGI_STATUS_OCCLUDED == hr)
+            {
+                // NOTE(tbt): window is minimised, cannot vsync
+                //            instead sleep for a little bit
+                Sleep(10);
             }
         }
     }

@@ -61,6 +61,8 @@ W32_WindowMake(W32_Window *window, S8 title, V2I dimensions, W_DrawHook draw)
     //-NOTE(tbt): save draw hook
     window->draw = draw;
     
+    V2I window_dimensions = W_DimensionsGet(window);
+    
     M_TempEnd(&scratch);
 }
 
@@ -623,18 +625,6 @@ W_Update(W_Handle window)
     }
     
     W32_WindowDraw(w);
-    
-    // TODO(tbt): swap buffer on all windows all together at end of main loop
-    
-    HRESULT hr = IDXGISwapChain_Present(w->swap_chain, w->is_vsync ? 1 : 0, 0);
-    Assert_(!FAILED(hr), "Failed to present swapchain. Device lost?");
-    if(DXGI_STATUS_OCCLUDED == hr)
-    {
-        // NOTE(tbt): window is minimised, cannot vsync
-        //            instead sleep for a little bit
-        Sleep(10);
-    }
-    
     
     Bool result = !w->should_close;
     return result;

@@ -33,6 +33,7 @@ Function void
 UpdateAndRender(W_Handle window)
 {
     R_CmdClear(Col(1.0f, 1.0f, 1.0f, 1.0f));
+    R_CmdDrawCircleFill(Centre2F(W_ClientRectGet(window)), 128.0f, Col(0.0f, 0.0f, 0.0f, 1.0f));
 }
 
 Function void
@@ -51,6 +52,8 @@ EntryPoint
 {
     G_Init();
     G_WindowOpen(S8("hello world"), V2I(1024, 768), example_app_hooks);
+    G_WindowOpen(S8("hello world 2"), V2I(1024, 768), example_app_hooks);
+    G_WindowOpen(S8("hello world 3"), V2I(1024, 768), example_app_hooks);
     G_MainLoop();
     G_Cleanup();
     return 0;
